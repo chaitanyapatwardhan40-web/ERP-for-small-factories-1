@@ -34,7 +34,7 @@ export async function adjustStockAction(_prev: ActionState, formData: FormData):
       if (input.mode === "receive") delta = Math.abs(input.qty);
       if (delta === 0) throw new Error("No difference to post");
       const type = input.mode === "scrap" ? "scrap" : input.mode === "receive" ? "receipt" : "adjust";
-      const glEvent = input.mode === "scrap" ? "inventory.scrap" : delta > 0 ? "inventory.adjust_up" : "inventory.adjust_down";
+      const glEvent = input.mode === "scrap" ? "inventory.scrap" : input.mode === "receive" ? "inventory.opening" : delta > 0 ? "inventory.adjust_up" : "inventory.adjust_down";
       await moveStock(tx, {
         orgId: ctx.orgId,
         userId: ctx.userId,

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { uuidOr404 } from "@/lib/ids";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -8,6 +9,7 @@ import { ItemForm } from "@/components/forms/item-form";
 
 export default async function EditItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [item] = await db.select().from(items).where(and(eq(items.id, id), eq(items.orgId, ctx.orgId)));

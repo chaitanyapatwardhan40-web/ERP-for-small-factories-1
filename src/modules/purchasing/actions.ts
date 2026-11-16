@@ -129,6 +129,6 @@ export async function payBillAction(_prev: ActionState, formData: FormData): Pro
     const db = await getDb();
     await db.transaction((tx) => payBill(tx, ctx, input));
     revalidatePath(`/bills/${input.billId}`);
-    return { ok: "Payment recorded." };
+    redirect(`/bills/${input.billId}`);
   });
 }

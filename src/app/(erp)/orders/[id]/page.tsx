@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
@@ -16,6 +17,7 @@ import { fmtDate, fmtDateTime, fmtMoney, fmtQty } from "@/lib/money";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [row] = await db

@@ -76,6 +76,6 @@ export async function customerPaymentAction(_prev: ActionState, formData: FormDa
     const db = await getDb();
     await db.transaction((tx) => recordCustomerPayment(tx, ctx, input));
     revalidatePath(`/invoices/${input.invoiceId}`);
-    return { ok: "Payment recorded." };
+    redirect(`/invoices/${input.invoiceId}`);
   });
 }

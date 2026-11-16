@@ -58,6 +58,7 @@ export const DEFAULT_RULES: PostingRuleTemplate[] = [
   { event: "sales.invoice", debit: "accounts_receivable", credit: "revenue", description: "Customer invoiced" },
   { event: "sales.tax", debit: "accounts_receivable", credit: "sales_tax_payable", description: "Sales tax on an invoice" },
   { event: "sales.payment", debit: "cash", credit: "accounts_receivable", description: "Customer payment received" },
+  { event: "inventory.opening", debit: "inventory", credit: "owner_equity", description: "Opening stock when going live" },
   { event: "inventory.adjust_up", debit: "inventory", credit: "inventory_adjustment", description: "Count found more than the book" },
   { event: "inventory.adjust_down", debit: "inventory_adjustment", credit: "inventory", description: "Count found less than the book" },
   { event: "inventory.scrap", debit: "scrap_expense", credit: "inventory", description: "Stock scrapped" },

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { uuidOr404 } from "@/lib/ids";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -8,6 +9,7 @@ import { fmtDate, fmtMoney, fmtQty } from "@/lib/money";
 
 export default async function PrintInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [row] = await db.select({ inv: invoices, customer: customers, order: salesOrders }).from(invoices).innerJoin(customers, eq(customers.id, invoices.customerId)).leftJoin(salesOrders, eq(salesOrders.id, invoices.orderId)).where(and(eq(invoices.id, id), eq(invoices.orgId, ctx.orgId)));

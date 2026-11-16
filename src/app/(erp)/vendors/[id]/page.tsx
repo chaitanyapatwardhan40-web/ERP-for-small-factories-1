@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
@@ -11,6 +12,7 @@ import { fmtDate, fmtMoney } from "@/lib/money";
 
 export default async function VendorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [v] = await db.select().from(vendors).where(and(eq(vendors.id, id), eq(vendors.orgId, ctx.orgId)));

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { uuidOr404 } from "@/lib/ids";
 import { and, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -8,6 +9,7 @@ import { VendorForm } from "@/components/forms/party-forms";
 
 export default async function EditVendorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [v] = await db.select().from(vendors).where(and(eq(vendors.id, id), eq(vendors.orgId, ctx.orgId)));

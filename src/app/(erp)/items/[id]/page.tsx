@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
-import { attachments, bomLines, bomRevisions, items, orgs, routingOperations, routings, vendors, workCenters } from "@/lib/db/schema";
+import { attachments, bomLines, bomRevisions, items, orgs, routingOperations, vendors, workCenters } from "@/lib/db/schema";
 import { Badge, Card, DL, PageHeader } from "@/components/ui/page";
 import { LinkButton, Button } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
@@ -16,6 +17,7 @@ import { AttachmentsCard } from "@/components/forms/attachments";
 
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [item] = await db.select().from(items).where(and(eq(items.id, id), eq(items.orgId, ctx.orgId)));

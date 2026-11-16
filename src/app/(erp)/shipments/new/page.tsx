@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { isUuid } from "@/lib/ids";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -17,7 +18,7 @@ export default async function NewShipmentPage({ searchParams }: { searchParams: 
   const { orderId } = await searchParams;
   const ctx = await requireOrg();
   const db = await getDb();
-  if (!orderId) notFound();
+  if (!orderId || !isUuid(orderId)) notFound();
   const [row] = await db.select({ o: salesOrders, customerName: customers.name }).from(salesOrders).innerJoin(customers, eq(customers.id, salesOrders.customerId)).where(and(eq(salesOrders.id, orderId), eq(salesOrders.orgId, ctx.orgId)));
   if (!row) notFound();
   const lines = await db.select({ l: salesOrderLines, sku: items.sku }).from(salesOrderLines).innerJoin(items, eq(items.id, salesOrderLines.itemId)).where(eq(salesOrderLines.orderId, orderId)).orderBy(asc(salesOrderLines.lineNo));

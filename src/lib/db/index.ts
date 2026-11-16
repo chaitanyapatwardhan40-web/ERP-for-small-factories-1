@@ -35,6 +35,13 @@ async function createDb(): Promise<Db> {
   await client.waitReady;
   const db = drizzle({ client, schema });
   await migrate(db, { migrationsFolder: MIGRATIONS });
+  // Flush the embedded database to disk on shutdown so nothing is lost on a
+  // kill signal (PGlite writes lazily).
+  if (dataDir !== "memory://") {
+    const flush = () => client.close().catch(() => undefined).finally(() => process.exit(0));
+    process.once("SIGTERM", flush);
+    process.once("SIGINT", flush);
+  }
   return db as unknown as Db;
 }
 

@@ -54,11 +54,12 @@ export async function createShipment(
 }
 
 /** Ship: stock leaves at average cost, COGS / Inventory posts, the order advances. */
-export async function shipShipment(db: DbOrTx, actor: Actor, shipmentId: string) {
+export async function shipShipment(db: DbOrTx, actor: Actor, shipmentId: string, opts: { shippedAt?: Date } = {}) {
   const [sh] = await db.select().from(shipments).where(and(eq(shipments.id, shipmentId), eq(shipments.orgId, actor.orgId)));
   if (!sh) throw new ShippingError("Shipment not found");
   if (sh.status === "shipped") throw new ShippingError("Already shipped");
   const lines = await db.select().from(shipmentLines).where(eq(shipmentLines.shipmentId, sh.id));
+  const shippedAt = opts.shippedAt ?? new Date();
   for (const l of lines) {
     if (!l.locationId) throw new ShippingError("Shipment line has no location");
     await moveStock(db, {
@@ -72,6 +73,7 @@ export async function shipShipment(db: DbOrTx, actor: Actor, shipmentId: string)
       refType: "shipment",
       refId: sh.id,
       memo: `${sh.number}`,
+      date: shippedAt.toISOString().slice(0, 10),
       glEvent: "sales.ship",
     });
     await db
@@ -79,19 +81,19 @@ export async function shipShipment(db: DbOrTx, actor: Actor, shipmentId: string)
       .set({ qtyShipped: sql`${salesOrderLines.qtyShipped} + ${Number(l.qty)}`, updatedAt: new Date() })
       .where(eq(salesOrderLines.id, l.orderLineId));
   }
-  await db.update(shipments).set({ status: "shipped", shippedAt: new Date(), shippedBy: actor.userId, updatedAt: new Date() }).where(eq(shipments.id, sh.id));
+  await db.update(shipments).set({ status: "shipped", shippedAt, shippedBy: actor.userId, updatedAt: new Date() }).where(eq(shipments.id, sh.id));
   await recomputeOrderStatus(db, actor.orgId, sh.orderId);
   await audit(db, { ...actor, action: "shipment.ship", entityType: "shipment", entityId: sh.id });
 }
 
 /** Ship everything open on an order from one location in a single step. */
-export async function shipOrderInFull(db: DbOrTx, actor: Actor, orderId: string, locationId: string, extra: { carrier?: string | null; tracking?: string | null } = {}) {
+export async function shipOrderInFull(db: DbOrTx, actor: Actor, orderId: string, locationId: string, extra: { carrier?: string | null; tracking?: string | null; shippedAt?: Date } = {}) {
   const orderLines = await db.select().from(salesOrderLines).where(and(eq(salesOrderLines.orderId, orderId), eq(salesOrderLines.orgId, actor.orgId)));
   const lines = orderLines
     .map((l) => ({ orderLineId: l.id, qty: round4(Number(l.qty) - Number(l.qtyShipped)), locationId }))
     .filter((l) => l.qty > 0);
-  const sh = await createShipment(db, actor, { orderId, lines, ...extra });
-  await shipShipment(db, actor, sh.id);
+  const sh = await createShipment(db, actor, { orderId, lines, carrier: extra.carrier, tracking: extra.tracking });
+  await shipShipment(db, actor, sh.id, { shippedAt: extra.shippedAt });
   return sh;
 }
 

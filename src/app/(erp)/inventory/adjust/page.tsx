@@ -5,25 +5,27 @@ import { Card, PageHeader } from "@/components/ui/page";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, FormGrid, Input, Select } from "@/components/ui/fields";
 import { adjustStockAction, transferStockAction } from "@/modules/inventory/actions";
+import type { PickItem } from "@/components/forms/line-editor";
 
 export const metadata = { title: "Count, adjust, move" };
 
-export default async function AdjustPage({ searchParams }: { searchParams: Promise<{ itemId?: string }> }) {
-  const { itemId } = await searchParams;
-  const ctx = await requireOrg();
-  const db = await getDb();
-  const [itemList, locs] = await Promise.all([pickItems(db, ctx.orgId), pickLocations(db, ctx.orgId)]);
-  const ItemSelect = ({ name }: { name: string }) => (
-    <Select name={name} required defaultValue={itemId ?? ""}>
+type Loc = { id: string; code: string; name: string };
+
+function ItemSelect({ name, items, def }: { name: string; items: PickItem[]; def?: string }) {
+  return (
+    <Select name={name} required defaultValue={def ?? ""}>
       <option value="">Select item</option>
-      {itemList.map((i) => (
+      {items.map((i) => (
         <option key={i.id} value={i.id}>
           {i.sku} · {i.name}
         </option>
       ))}
     </Select>
   );
-  const LocSelect = ({ name, def }: { name: string; def?: string }) => (
+}
+
+function LocSelect({ name, locs, def }: { name: string; locs: Loc[]; def?: string }) {
+  return (
     <Select name={name} required defaultValue={def ?? locs[0]?.id ?? ""}>
       {locs.map((l) => (
         <option key={l.id} value={l.id}>
@@ -32,6 +34,13 @@ export default async function AdjustPage({ searchParams }: { searchParams: Promi
       ))}
     </Select>
   );
+}
+
+export default async function AdjustPage({ searchParams }: { searchParams: Promise<{ itemId?: string }> }) {
+  const { itemId } = await searchParams;
+  const ctx = await requireOrg();
+  const db = await getDb();
+  const [itemList, locs] = await Promise.all([pickItems(db, ctx.orgId), pickLocations(db, ctx.orgId)]);
   return (
     <>
       <PageHeader title="Count, adjust, move" crumbs={[{ href: "/inventory", label: "Inventory" }]} description="Counts post the difference to the book. Adjustments and scrap hit the ledger; moves between locations do not." />
@@ -40,10 +49,10 @@ export default async function AdjustPage({ searchParams }: { searchParams: Promi
           <ActionForm action={adjustStockAction} className="space-y-3">
             <FormGrid cols={2}>
               <Field label="Item" className="md:col-span-2">
-                <ItemSelect name="itemId" />
+                <ItemSelect name="itemId" items={itemList} def={itemId} />
               </Field>
               <Field label="Location">
-                <LocSelect name="locationId" />
+                <LocSelect name="locationId" locs={locs} />
               </Field>
               <Field label="Mode">
                 <Select name="mode" defaultValue="count">
@@ -73,13 +82,13 @@ export default async function AdjustPage({ searchParams }: { searchParams: Promi
           <ActionForm action={transferStockAction} className="space-y-3">
             <FormGrid cols={2}>
               <Field label="Item" className="md:col-span-2">
-                <ItemSelect name="itemId" />
+                <ItemSelect name="itemId" items={itemList} def={itemId} />
               </Field>
               <Field label="From">
-                <LocSelect name="fromLocationId" />
+                <LocSelect name="fromLocationId" locs={locs} />
               </Field>
               <Field label="To">
-                <LocSelect name="toLocationId" def={locs[1]?.id} />
+                <LocSelect name="toLocationId" locs={locs} def={locs[1]?.id} />
               </Field>
               <Field label="Quantity">
                 <Input name="qty" type="number" step="0.0001" required />

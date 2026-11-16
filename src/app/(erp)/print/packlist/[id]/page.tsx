@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { uuidOr404 } from "@/lib/ids";
 import { and, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -8,6 +9,7 @@ import { fmtDate, fmtQty } from "@/lib/money";
 
 export default async function PrintPackListPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [row] = await db.select({ s: shipments, order: salesOrders, customer: customers }).from(shipments).innerJoin(salesOrders, eq(salesOrders.id, shipments.orderId)).innerJoin(customers, eq(customers.id, shipments.customerId)).where(and(eq(shipments.id, id), eq(shipments.orgId, ctx.orgId)));

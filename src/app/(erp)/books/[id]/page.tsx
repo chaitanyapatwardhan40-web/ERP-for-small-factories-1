@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
@@ -12,6 +13,7 @@ import { fmtDate, fmtMoney } from "@/lib/money";
 /** /books/[id] shows an account's activity, or one journal entry with ?entry=1. */
 export default async function BookDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ entry?: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const { entry } = await searchParams;
   const ctx = await requireOrg();
   const db = await getDb();
@@ -84,10 +86,18 @@ export default async function BookDetailPage({ params, searchParams }: { params:
     .orderBy(desc(journalEntries.entryDate), desc(journalEntries.createdAt))
     .limit(300);
   const natural = acct.type === "asset" || acct.type === "expense";
-  let running = rows.reduce((s, r) => s + (natural ? Number(r.l.debit) - Number(r.l.credit) : Number(r.l.credit) - Number(r.l.debit)), 0);
+  const delta = (l: { debit: number; credit: number }) => (natural ? Number(l.debit) - Number(l.credit) : Number(l.credit) - Number(l.debit));
+  const total = rows.reduce((s, r) => s + delta(r.l), 0);
+  // Running balance per row, newest first: the balance after that row posted.
+  const balances: number[] = [];
+  let run = total;
+  for (const r of rows) {
+    balances.push(run);
+    run -= delta(r.l);
+  }
   return (
     <>
-      <PageHeader title={`${acct.code} ${acct.name}`} description={`${acct.type} · ${acct.subtype.replaceAll("_", " ")} · balance ${fmtMoney(running)}`} crumbs={[{ href: "/books", label: "Ledger" }]} />
+      <PageHeader title={`${acct.code} ${acct.name}`} description={`${acct.type} · ${acct.subtype.replaceAll("_", " ")} · balance ${fmtMoney(total)}`} crumbs={[{ href: "/books", label: "Ledger" }]} />
       <Card padded={false}>
         <table className="data">
           <thead>
@@ -101,9 +111,8 @@ export default async function BookDetailPage({ params, searchParams }: { params:
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ l, je }) => {
-              const bal = running;
-              running -= natural ? Number(l.debit) - Number(l.credit) : Number(l.credit) - Number(l.debit);
+            {rows.map(({ l, je }, i) => {
+              const bal = balances[i];
               return (
                 <tr key={l.id}>
                   <td>{fmtDate(je.entryDate)}</td>

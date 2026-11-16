@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+      - name: Migration drift check
+        run: |
+          npm run db:generate -- --name ci-drift-check
+          if git status --porcelain drizzle | grep -q .; then
+            echo "Schema changed without a migration. Run npm run db:generate and commit the result."
+            git status --porcelain drizzle
+            exit 1
+          fi

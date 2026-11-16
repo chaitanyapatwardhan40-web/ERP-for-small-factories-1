@@ -55,9 +55,21 @@ export async function withFormErrors<T>(fn: () => Promise<T>): Promise<T | { err
   } catch (e) {
     if (e instanceof z.ZodError) return { error: zodMessage(e) };
     if (isRedirectError(e)) throw e;
-    const msg = e instanceof Error ? e.message : String(e);
-    return { error: msg };
+    return { error: errorMessage(e) };
   }
+}
+
+/** Drizzle wraps driver errors; the useful text (unique violation, FK...) is in the cause. */
+export function errorMessage(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const cause = (e as { cause?: unknown }).cause;
+  if (cause instanceof Error && cause.message) {
+    const m = cause.message;
+    if (/duplicate key|unique/i.test(m)) return "That number or code is already used. Try again.";
+    if (/violates foreign key/i.test(m)) return "That record is still referenced by another record.";
+    return e.message.startsWith("Failed query") ? m : `${e.message} (${m})`;
+  }
+  return e.message;
 }
 
 function isRedirectError(e: unknown): boolean {

@@ -138,10 +138,11 @@ export async function completeWorkOrderAction(_prev: ActionState, formData: Form
     const input = z.object({ workOrderId: reqStr, qtyGood: z.coerce.number().min(0), qtyScrap: optNum, locationId: reqStr, lotNumber: optStr }).parse(formObject(formData));
     const db = await getDb();
     const [org] = await db.select().from(orgs).where(eq(orgs.id, ctx.orgId));
-    const r = await db.transaction((tx) =>
+    await db.transaction((tx) =>
       completeWorkOrder(tx, ctx, { ...input, lotNumber: input.lotNumber ?? null, overheadPct: org?.settings.overheadPct ?? 0 }),
     );
     revalidatePath(`/work-orders/${input.workOrderId}`);
-    return { ok: `Completed ${r.good} good, ${r.scrap} scrap at ${r.unitCost.toFixed(4)} each.` };
+    // The completion card unmounts on success; the Result card on the fresh page shows the outcome.
+    redirect(`/work-orders/${input.workOrderId}`);
   });
 }

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { uuidOr404 } from "@/lib/ids";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -9,6 +10,7 @@ import { fmtDate, fmtQty } from "@/lib/money";
 /** The shop traveler: what to make, from what, in which steps, with sign-offs. */
 export default async function PrintTravelerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  uuidOr404(id);
   const ctx = await requireOrg();
   const db = await getDb();
   const [row] = await db.select({ wo: workOrders, item: items }).from(workOrders).innerJoin(items, eq(items.id, workOrders.itemId)).where(and(eq(workOrders.id, id), eq(workOrders.orgId, ctx.orgId)));
