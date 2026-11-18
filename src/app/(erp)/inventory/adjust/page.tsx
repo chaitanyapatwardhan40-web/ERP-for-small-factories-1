@@ -43,7 +43,7 @@ export default async function AdjustPage({ searchParams }: { searchParams: Promi
   const [itemList, locs] = await Promise.all([pickItems(db, ctx.orgId), pickLocations(db, ctx.orgId)]);
   return (
     <>
-      <PageHeader title="Count, adjust, move" crumbs={[{ href: "/inventory", label: "Inventory" }]} description="Counts post the difference to the book. Adjustments and scrap hit the ledger; moves between locations do not." />
+      <PageHeader title="Count, adjust, move" crumbs={[{ href: "/inventory", label: "Inventory" }]} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Count or adjust">
           <ActionForm action={adjustStockAction} className="space-y-3">

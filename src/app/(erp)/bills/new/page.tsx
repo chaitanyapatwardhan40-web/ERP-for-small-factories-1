@@ -16,7 +16,7 @@ export default async function NewBillPage({ searchParams }: { searchParams: Prom
   const vendorList = await pickVendors(db, ctx.orgId);
   return (
     <>
-      <PageHeader title="New expense bill" crumbs={[{ href: "/bills", label: "Vendor bills" }]} description="For bills with no purchase order. Bills for received goods are created from the PO." />
+      <PageHeader title="New expense bill" crumbs={[{ href: "/bills", label: "Vendor bills" }]} />
       <Card>
         <ActionForm action={expenseBillAction} className="space-y-4">
           <FormGrid cols={3}>

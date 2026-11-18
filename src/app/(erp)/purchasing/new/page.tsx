@@ -18,7 +18,7 @@ export default async function NewPoPage({ searchParams }: { searchParams: Promis
   const initial = itemId ? [{ itemId, description: itemList.find((i) => i.id === itemId)?.name ?? "", unitPrice: String(itemList.find((i) => i.id === itemId)?.lastCost ?? "") }] : undefined;
   return (
     <>
-      <PageHeader title="New purchase order" crumbs={[{ href: "/purchasing", label: "Purchase orders" }]} description={workOrderId ? "Outside processing for a work order: the cost lands in WIP when received." : undefined} />
+      <PageHeader title="New purchase order" crumbs={[{ href: "/purchasing", label: "Purchase orders" }]} description={workOrderId ? "Outside processing" : undefined} />
       <ActionForm action={createPoAction} className="space-y-4">
         {workOrderId ? <input type="hidden" name="workOrderId" value={workOrderId} /> : null}
         <Card>

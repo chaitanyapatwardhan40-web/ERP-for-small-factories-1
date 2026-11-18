@@ -189,7 +189,6 @@ export default async function PoPage({ params }: { params: Promise<{ id: string 
                   </label>
                   <SubmitButton>Receive</SubmitButton>
                 </div>
-                <p className="text-xs text-ink-3">{wo ? `Outside processing: value posts to WIP on ${wo.number}.` : "Posts Inventory / Accrued purchases at the PO cost and updates the item's average cost."}</p>
               </ActionForm>
             </Card>
           ) : null}

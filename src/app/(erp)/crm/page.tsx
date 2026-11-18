@@ -26,7 +26,7 @@ export default async function CrmPage() {
   const draft = radar.length ? draftReactivationEmail(org?.name ?? "Our shop", radar[0].customer.name, radar[0].usedToBuy, radar[0].daysQuiet) : null;
   return (
     <>
-      <PageHeader title="Leads and marketing" description="A pipeline for new work and a radar for old customers who went quiet." />
+      <PageHeader title="Leads" />
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Stat label="Open leads" value={openLeads.length} hint={fmtMoney(pipeline)} />
         <Stat label="Quiet customers" value={radar.length} hint="no order in 6 months" tone={radar.length ? "warn" : undefined} />
@@ -67,7 +67,7 @@ export default async function CrmPage() {
                     <td>
                       <form action={leadStageAction} className="flex items-center gap-1">
                         <input type="hidden" name="id" value={l.id} />
-                        <select name="stage" defaultValue={l.stage} className="rounded-md border border-line bg-white px-1 py-0.5 text-xs">
+                        <select name="stage" defaultValue={l.stage} className="rounded border border-line bg-white px-1 py-0.5 text-xs">
                           {LEAD_STAGES.map((s) => (
                             <option key={s} value={s}>
                               {s}
@@ -148,7 +148,7 @@ export default async function CrmPage() {
                     Mark as sent
                   </SubmitButton>
                 </div>
-                <p className="text-xs text-ink-3">The draft is written from order history. Hook up RESEND_API_KEY to send from the app; until then copy it into your mail client.</p>
+                <p className="text-xs text-ink-3">Copy the draft into your mail client to send it.</p>
               </ActionForm>
             </Card>
           ) : null}

@@ -10,7 +10,7 @@ Phase gates are passed by pilot shops, not demos. See the plan doc for the gates
    address that turns forwarded RFQs, customer POs, vendor confirmations and invoices into draft
    records (the inbox agent). Drafts land in a "proposed changes" list, never straight into the books.
 3. **Implementer v2.** QuickBooks exports (customers, vendors, items, open AR/AP, trial balance as
-   opening balances), drawings → items (part number from the title block via Claude), old quotes →
+   opening balances), drawings → items (part number read from the title block), old quotes →
    price history. Keep every import idempotent.
 4. **QuickBooks Online sync** for shops that keep their accountant on QuickBooks during transition:
    invoices, bills, payments mirrored; a 90-day mirror before switching the ledger off.

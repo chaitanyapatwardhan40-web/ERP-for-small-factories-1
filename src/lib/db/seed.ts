@@ -1,7 +1,8 @@
 /**
  * The golden dataset: one kitting shop, three programs, about 120 sales
  * orders in every state, with the books posted from every event. Used by
- * demos, previews and tests. Run with `npm run db:seed`.
+ * demos, previews and tests. Run with `npm run db:seed`; `npm run demo:snapshot`
+ * packs the result into data/demo.tar.gz for demo mode.
  *
  * Everything goes through the same services the app uses, so the ledger,
  * inventory and job costs are consistent by construction.
@@ -51,17 +52,17 @@ const rnd = () => {
 const pick = <T,>(arr: T[]) => arr[Math.floor(rnd() * arr.length)];
 const between = (a: number, b: number) => a + Math.floor(rnd() * (b - a + 1));
 
-async function main() {
+export async function seedDemo() {
   const db = await getDb();
   const [existing] = await db.select().from(users).where(eq(users.email, "owner@kitwise.demo"));
   if (existing) {
-    console.log("Demo shop already seeded. Delete ./.data to start over.");
+    console.log("Already seeded. Run npm run db:reset to start over.");
     return;
   }
-  console.log("Seeding Kitwise demo shop…");
-  const owner = await registerUser(db, { email: "owner@kitwise.demo", name: "Sam Owner", password: "kitwise-demo" });
-  const office = await registerUser(db, { email: "office@kitwise.demo", name: "Dana Office", password: "kitwise-demo" });
-  const floor = await registerUser(db, { email: "floor@kitwise.demo", name: "Pat Floor", password: "kitwise-demo" });
+  console.log("Seeding the sample company…");
+  const owner = await registerUser(db, { email: "owner@kitwise.demo", name: "Maria Castellano", password: "kitwise-demo" });
+  const office = await registerUser(db, { email: "office@kitwise.demo", name: "Dan Whitfield", password: "kitwise-demo" });
+  const floor = await registerUser(db, { email: "floor@kitwise.demo", name: "Pat Nguyen", password: "kitwise-demo" });
   const org = await createOrg(db, { name: "Northline Kitting & Assembly", ownerUserId: owner.id, overheadPct: 25, taxRatePct: 0 });
   const { memberships } = await import("./schema");
   await db.insert(memberships).values([
@@ -139,7 +140,7 @@ async function main() {
 
   // Customers.
   const custDefs: [string, string, number][] = [
-    ["Acme Robotics", "Columbus, OH", 30],
+    ["Harbor Automation", "Columbus, OH", 30],
     ["Helix Medical Devices", "Cleveland, OH", 45],
     ["Orion Defense Systems", "Dayton, OH", 60],
     ["Greenfield Agri-Tech", "Fort Wayne, IN", 30],
@@ -284,7 +285,7 @@ async function main() {
 
   // Sell: three kitting programs, one order per kit; mix of stages.
   const programs: [string, string, string[], number][] = [
-    ["P-2026-ARM", "Acme Robotics", ["KIT-ROBOT-ARM", "KIT-SPARES-A"], 45],
+    ["P-2026-ARM", "Harbor Automation", ["KIT-ROBOT-ARM", "KIT-SPARES-A"], 45],
     ["P-2026-SENSE", "Helix Medical Devices", ["KIT-SENSOR-SET", "KIT-PRESSURE-MON", "KIT-CTRL-UPGRADE"], 40],
     ["P-2026-MOUNT", "Orion Defense Systems", ["KIT-FRAME-MOUNT", "KIT-HOUSING-SVC"], 35],
   ];
@@ -358,9 +359,11 @@ async function main() {
   console.log("Sign in: owner@kitwise.demo / kitwise-demo (also office@ and floor@ with the same password)");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+if (process.argv[1] && /seed\.ts$/.test(process.argv[1])) {
+  seedDemo()
+    .then(() => process.exit(0))
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
+}

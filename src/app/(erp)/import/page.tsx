@@ -20,8 +20,8 @@ export default async function ImportPage() {
   return (
     <>
       <PageHeader
-        title="Import: the implementer"
-        description="Drop in the spreadsheets the shop already runs on. Customers, vendors, parts, BOMs, work centers, stock counts, people. Order: vendors → items → BOMs → stock."
+        title="Import data"
+        description="CSV or Excel. Import vendors before items, and items before BOMs and stock counts."
       />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -30,15 +30,14 @@ export default async function ImportPage() {
           </Card>
         </div>
         <div className="space-y-4">
-          <Card title="What the implementer does">
+          <Card title="How it works">
             <ol className="list-inside list-decimal space-y-1 text-sm text-ink-2">
-              <li>Reads any sheet, finds the header row, drops blank lines.</li>
-              <li>Works out whether it is customers, vendors, parts, a BOM, machines, a stock count or people.</li>
-              <li>Maps columns by header meaning (Part #, P/N, Item No all mean SKU) and lets you fix any guess.</li>
-              <li>Loads rows without duplicating: same SKU or code updates the record.</li>
-              <li>Opening stock posts to inventory and the ledger in one go.</li>
+              <li>Finds the header row and skips blank lines.</li>
+              <li>Detects the record type: customers, vendors, items, BOM, work centers, stock count or employees.</li>
+              <li>Maps columns from the header names. You can change any mapping before loading.</li>
+              <li>Rows with an existing code or SKU update that record.</li>
+              <li>Stock counts post opening stock to inventory and the ledger.</li>
             </ol>
-            <p className="mt-3 text-xs text-ink-3">Next on the roadmap: QuickBooks export files, drawings to items, old quotes to price history, and an inbox address for RFQs and POs.</p>
           </Card>
           {history.length ? (
             <Card title="Recent imports">

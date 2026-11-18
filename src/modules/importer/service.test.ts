@@ -21,7 +21,7 @@ beforeAll(async () => {
   await db.insert(locations).values({ orgId: org.id, code: "MAIN", name: "Main", type: "stock" });
 });
 
-describe("the implementer: messy spreadsheets in, configured system out", () => {
+describe("importer: messy spreadsheets in, records out", () => {
   it("recognises an item list with odd headers and maps the columns", () => {
     const csv = "Part #,Description,Make/Buy,U/M,Std Cost,Qty On Hand,Supplier\nKIT-100,Sensor kit assy,M,EA,$12.50,0,\nPLATE-1,Alum plate 6x6,B,ea,\"1,234.00\",40,Metal Supply\n";
     const [sheet] = parseSpreadsheet("items.csv", Buffer.from(csv));

@@ -116,7 +116,7 @@ export function LineEditor({
                   name={`lines[${i}][itemId]`}
                   value={r.itemId}
                   onChange={(e) => pick(r.key, e.target.value)}
-                  className="w-full rounded-md border border-line bg-white px-2 py-1 text-sm"
+                  className="w-full rounded border border-line bg-white px-2 py-1 text-sm"
                   required={mode !== "quote"}
                 >
                   <option value="">{mode === "quote" ? "— custom —" : "Select item"}</option>
@@ -128,10 +128,10 @@ export function LineEditor({
                 </select>
               </td>
               <td>
-                <input name={`lines[${i}][description]`} value={r.description} onChange={(e) => update(r.key, { description: e.target.value })} className="w-full rounded-md border border-line px-2 py-1 text-sm" required={mode === "quote"} />
+                <input name={`lines[${i}][description]`} value={r.description} onChange={(e) => update(r.key, { description: e.target.value })} className="w-full rounded border border-line px-2 py-1 text-sm" required={mode === "quote"} />
               </td>
               <td>
-                <input name={`lines[${i}][qty]`} type="number" step="0.0001" min="0" value={r.qty} onChange={(e) => update(r.key, { qty: e.target.value })} className="w-full rounded-md border border-line px-2 py-1 text-right text-sm" required />
+                <input name={`lines[${i}][qty]`} type="number" step="0.0001" min="0" value={r.qty} onChange={(e) => update(r.key, { qty: e.target.value })} className="w-full rounded border border-line px-2 py-1 text-right text-sm" required />
               </td>
               {mode === "quote" ? (
                 <>
@@ -143,7 +143,7 @@ export function LineEditor({
                         step={f === "leadTimeDays" ? "1" : "0.01"}
                         value={r[f]}
                         onChange={(e) => update(r.key, { [f]: e.target.value })}
-                        className="w-full rounded-md border border-line px-2 py-1 text-right text-sm"
+                        className="w-full rounded border border-line px-2 py-1 text-right text-sm"
                       />
                     </td>
                   ))}
@@ -158,7 +158,7 @@ export function LineEditor({
                   value={r.unitPrice}
                   placeholder={mode === "quote" ? priceOf(r).toFixed(2) : ""}
                   onChange={(e) => update(r.key, { unitPrice: e.target.value })}
-                  className="w-full rounded-md border border-line px-2 py-1 text-right text-sm"
+                  className="w-full rounded border border-line px-2 py-1 text-right text-sm"
                   required={mode !== "quote"}
                 />
               </td>
@@ -177,7 +177,7 @@ export function LineEditor({
           + Add line
         </button>
         <div className="text-sm">
-          {mode === "quote" && overheadPct ? <span className="mr-4 text-xs text-ink-3">Shop overhead policy: {overheadPct}% of labour</span> : null}
+          {mode === "quote" && overheadPct ? <span className="mr-4 text-xs text-ink-3">Overhead {overheadPct}% of labour</span> : null}
           Total <strong className="tabular-nums">{money(total)}</strong>
         </div>
       </div>

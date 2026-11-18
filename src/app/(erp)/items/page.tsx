@@ -24,15 +24,15 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
       <PageHeader title="Items, BOMs and routings" description={`${rows.length} items`} actions={<LinkButton href="/items/new">New item</LinkButton>} />
       <Tabs tabs={ITEM_TABS} current="/items" />
       <form className="mb-3 flex gap-2">
-        <input name="q" defaultValue={q ?? ""} placeholder="Search SKU or name" className="w-64 rounded-md border border-line bg-white px-3 py-1.5 text-sm" />
-        <select name="type" defaultValue={type ?? ""} className="rounded-md border border-line bg-white px-2 py-1.5 text-sm">
+        <input name="q" defaultValue={q ?? ""} placeholder="Search SKU or name" className="w-64 rounded border border-line bg-white px-3 py-1.5 text-sm" />
+        <select name="type" defaultValue={type ?? ""} className="rounded border border-line bg-white px-2 py-1.5 text-sm">
           <option value="">All types</option>
           <option value="make">Make</option>
           <option value="buy">Buy</option>
           <option value="phantom">Phantom</option>
           <option value="service">Service</option>
         </select>
-        <button className="rounded-md border border-line bg-white px-3 py-1.5 text-sm">Filter</button>
+        <button className="rounded border border-line bg-white px-3 py-1.5 text-sm">Filter</button>
       </form>
       {rows.length ? (
         <Card padded={false}>

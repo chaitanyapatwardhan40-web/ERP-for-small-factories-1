@@ -34,7 +34,7 @@ export function PrintDoc({
       <div className="mb-6 flex items-start justify-between border-b border-line pb-4">
         <div>
           <div className="text-xl font-semibold">{org?.name ?? "Kitwise"}</div>
-          <div className="text-xs text-ink-3">Prepared with Kitwise</div>
+          <div className="text-xs text-ink-3">Kitwise</div>
         </div>
         <div className="text-right">
           <div className="text-lg font-semibold uppercase tracking-wide">{title}</div>
@@ -64,7 +64,7 @@ export function PrintDoc({
       </div>
       {children}
       {notes ? (
-        <div className="mt-6 whitespace-pre-wrap rounded-md border border-line p-3 text-xs">
+        <div className="mt-6 whitespace-pre-wrap rounded border border-line p-3 text-xs">
           <div className="mb-1 font-semibold uppercase text-ink-3">Notes</div>
           {notes}
         </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Mark } from "@/components/brand";
 
 export type NavGroup = { label: string; items: { href: string; label: string }[] };
 
@@ -10,7 +11,7 @@ export const NAV: NavGroup[] = [
   {
     label: "Sell",
     items: [
-      { href: "/crm", label: "Leads & marketing" },
+      { href: "/crm", label: "Leads" },
       { href: "/customers", label: "Customers" },
       { href: "/quotes", label: "Quotes" },
       { href: "/orders", label: "Sales orders" },
@@ -66,10 +67,10 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Platform",
+    label: "Admin",
     items: [
       { href: "/documents", label: "Documents" },
-      { href: "/import", label: "Import (implementer)" },
+      { href: "/import", label: "Import data" },
       { href: "/settings", label: "Settings" },
     ],
   },
@@ -85,23 +86,23 @@ export function Sidebar({ orgName }: { orgName: string }) {
     return best === href;
   };
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-line bg-white">
-      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">K</div>
+    <aside className="flex h-screen w-56 shrink-0 flex-col bg-side text-side-text">
+      <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
+        <Mark size={26} className="shrink-0 text-brand" />
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{orgName}</div>
-          <div className="text-[11px] text-ink-3">Kitwise</div>
+          <div className="truncate text-[13px] font-medium leading-tight text-white">{orgName}</div>
+          <div className="text-[11px] leading-tight text-side-muted">Kitwise</div>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-2 text-sm">
+      <nav className="flex-1 overflow-y-auto px-2 pb-4 text-[13px]">
         {NAV.map((g) => (
-          <div key={g.label} className="mb-2">
-            {g.label ? <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-ink-3">{g.label}</div> : null}
+          <div key={g.label} className="mb-1.5">
+            {g.label ? <div className="px-2 pb-1 pt-3 text-[10.5px] font-medium uppercase tracking-[0.08em] text-side-muted">{g.label}</div> : null}
             {g.items.map((i) => (
               <Link
                 key={i.href}
                 href={i.href}
-                className={`block rounded-md px-2 py-1.5 ${isActive(i.href) ? "bg-brand-soft font-medium text-brand-dark" : "text-ink-2 hover:bg-paper hover:text-ink"}`}
+                className={`block rounded px-2 py-[5px] ${isActive(i.href) ? "bg-brand font-medium text-white" : "hover:bg-side-2 hover:text-white"}`}
               >
                 {i.label}
               </Link>

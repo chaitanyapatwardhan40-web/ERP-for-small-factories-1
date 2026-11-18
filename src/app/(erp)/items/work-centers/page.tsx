@@ -17,7 +17,7 @@ export default async function WorkCentersPage() {
   const rows = await db.select().from(workCenters).where(eq(workCenters.orgId, ctx.orgId)).orderBy(asc(workCenters.code));
   return (
     <>
-      <PageHeader title="Work centers" description="Machines or cells with an hourly rate and daily capacity. Routing operations run here." />
+      <PageHeader title="Work centers" />
       <Tabs tabs={ITEM_TABS} current="/items/work-centers" />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card padded={false} className="lg:col-span-2">
@@ -67,7 +67,7 @@ export default async function WorkCentersPage() {
                 <Input name="capacityHoursPerDay" type="number" step="0.5" defaultValue={8} />
               </Field>
             </FormGrid>
-            <p className="text-xs text-ink-3">To update an existing work center, enter its code again with new values.</p>
+            <p className="text-xs text-ink-3">Entering an existing code updates that work center.</p>
             <SubmitButton>Save</SubmitButton>
           </ActionForm>
         </Card>

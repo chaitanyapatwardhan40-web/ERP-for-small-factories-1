@@ -26,7 +26,7 @@ export default async function QualityPage({ searchParams }: { searchParams: Prom
   const passRate = recent.length ? Math.round((recent.filter((r) => r.i.result === "pass").length / recent.length) * 100) : null;
   return (
     <>
-      <PageHeader title="Inspections" description={`Incoming, in-process and final checks against a plan. ${passRate === null ? "" : `Pass rate on the last ${recent.length}: ${passRate}%.`}`} />
+      <PageHeader title="Inspections" description={passRate === null ? undefined : `Pass rate, last ${recent.length}: ${passRate}%`} />
       <Tabs tabs={QUALITY_TABS} current="/quality" />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -35,14 +35,14 @@ export default async function QualityPage({ searchParams }: { searchParams: Prom
               <>
                 <form className="mb-3 flex items-center gap-2 text-sm">
                   <span className="text-ink-3">Plan</span>
-                  <select name="plan" defaultValue={selected?.p.id} className="rounded-md border border-line bg-white px-2 py-1 text-sm">
+                  <select name="plan" defaultValue={selected?.p.id} className="rounded border border-line bg-white px-2 py-1 text-sm">
                     {plans.map((p) => (
                       <option key={p.p.id} value={p.p.id}>
                         {p.p.name} ({p.p.stage}{p.sku ? ` · ${p.sku}` : ""})
                       </option>
                     ))}
                   </select>
-                  <button className="rounded-md border border-line bg-white px-2 py-1 text-xs">Load</button>
+                  <button className="rounded border border-line bg-white px-2 py-1 text-xs">Load</button>
                 </form>
                 {selected ? (
                   <ActionForm action={recordInspectionAction} className="space-y-3">

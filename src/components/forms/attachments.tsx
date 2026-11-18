@@ -41,7 +41,7 @@ export function AttachmentsCard({ entityType, entityId, rows, returnTo }: { enti
         <input name="file" type="file" className="block w-full text-sm" required />
         <div className="flex gap-2">
           <Input name="revision" placeholder="Rev" className="w-20" defaultValue="A" />
-          <select name="kind" className="rounded-md border border-line bg-white px-2 py-1.5 text-sm" defaultValue="drawing">
+          <select name="kind" className="rounded border border-line bg-white px-2 py-1.5 text-sm" defaultValue="drawing">
             <option value="drawing">Drawing</option>
             <option value="spec">Spec</option>
             <option value="cert">Cert</option>

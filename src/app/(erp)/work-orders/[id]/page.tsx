@@ -343,7 +343,6 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 </Select>
                 <Input name="lotNumber" placeholder={`Lot (default ${wo.number})`} />
                 <SubmitButton className="w-full">Complete work order</SubmitButton>
-                <p className="text-xs text-ink-3">Applies overhead, writes off scrap, relieves WIP and puts the good units in stock at their actual cost.</p>
               </ActionForm>
             </Card>
           ) : null}

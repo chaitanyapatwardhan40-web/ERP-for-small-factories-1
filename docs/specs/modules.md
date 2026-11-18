@@ -58,6 +58,6 @@ email (delivery when Resend is wired). Assets, PM tasks by interval, downtime lo
 machine down. Employees with loaded rate and skills; hours feed job cost.
 
 ## Importer (`src/modules/importer`)
-Parse CSV/XLSX → find header row → guess entity → map columns (heuristics, Claude optional) →
+Parse CSV/XLSX → find header row → guess entity → map columns (header heuristics; language model optional) →
 user confirms → `runImport` upserts by code/SKU/name; opening stock posts `inventory.opening`.
 Row errors are collected, never abort the batch.

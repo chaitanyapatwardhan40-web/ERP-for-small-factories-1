@@ -20,7 +20,7 @@ export default async function BillsPage() {
   const t = today();
   return (
     <>
-      <PageHeader title="Vendor bills and payables" description="PO bills clear accrued purchases; expense bills (rent, tooling, utilities) post straight to expense." actions={<LinkButton href="/bills/new">New expense bill</LinkButton>} />
+      <PageHeader title="Vendor bills" actions={<LinkButton href="/bills/new">New expense bill</LinkButton>} />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat label="Open" value={fmtMoney(aging.buckets.total)} />
         <Stat label="Current" value={fmtMoney(aging.buckets.current)} tone="good" />

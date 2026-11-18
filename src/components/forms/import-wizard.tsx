@@ -28,7 +28,7 @@ export function ImportWizard({ aiEnabled }: { aiEnabled: boolean }) {
     const r = done.result;
     return (
       <div className="space-y-3">
-        <div className="rounded-md border border-good/30 bg-good-soft px-4 py-3 text-sm text-good">
+        <div className="rounded border border-good/30 bg-good-soft px-4 py-3 text-sm text-good">
           <strong>{ENTITIES[r.kind].label}:</strong> {r.created} created, {r.updated} updated, {r.skipped} skipped{r.errors.length ? `, ${r.errors.length} rows with problems` : ""}.
         </div>
         {r.errors.length ? (
@@ -52,16 +52,16 @@ export function ImportWizard({ aiEnabled }: { aiEnabled: boolean }) {
 
   return (
     <div className="space-y-4">
-      <form action={preview} className="flex flex-wrap items-end gap-3 rounded-md border border-dashed border-line bg-white p-4">
+      <form action={preview} className="flex flex-wrap items-end gap-3 rounded border border-dashed border-line bg-white p-4">
         <div>
           <span className="mb-1 block text-xs font-medium text-ink-2">Spreadsheet (.xlsx, .xls, .csv)</span>
           <input name="file" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm" className="text-sm" required={!p} />
         </div>
-        <Pending>Read it</Pending>
-        <span className="text-xs text-ink-3">{aiEnabled ? "Claude will read the headers and sample rows to map the columns." : "Set ANTHROPIC_API_KEY to let Claude map columns and flag data problems; without it, header matching does the job."}</span>
+        <Pending>Read file</Pending>
+        <span className="text-xs text-ink-3">{aiEnabled ? "Columns are mapped from the headers and sample rows." : "Columns are mapped from the header names."}</span>
       </form>
-      {state?.error ? <div className="rounded-md border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad">{state.error}</div> : null}
-      {done?.error ? <div className="rounded-md border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad">{done.error}</div> : null}
+      {state?.error ? <div className="rounded border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad">{state.error}</div> : null}
+      {done?.error ? <div className="rounded border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad">{done.error}</div> : null}
       {p ? (
         <form action={confirm} className="space-y-4">
           <input type="hidden" name="payload" value={p.payload} />
@@ -99,7 +99,7 @@ export function ImportWizard({ aiEnabled }: { aiEnabled: boolean }) {
           <input type="hidden" name="kind" value={p.kind} />
           <p className="text-xs text-ink-3">{ENTITIES[p.kind].hint}</p>
           {p.notes.length ? (
-            <ul className="list-inside list-disc rounded-md border border-warn/30 bg-warn-soft px-3 py-2 text-sm text-warn">
+            <ul className="list-inside list-disc rounded border border-warn/30 bg-warn-soft px-3 py-2 text-sm text-warn">
               {p.notes.map((n, i) => (
                 <li key={i}>{n}</li>
               ))}
@@ -123,7 +123,7 @@ export function ImportWizard({ aiEnabled }: { aiEnabled: boolean }) {
                       {f.required ? <span className="text-bad"> *</span> : null}
                     </td>
                     <td>
-                      <select name={`map[${f.key}]`} defaultValue={h ?? ""} className="w-full rounded-md border border-line bg-white px-2 py-1 text-sm">
+                      <select name={`map[${f.key}]`} defaultValue={h ?? ""} className="w-full rounded border border-line bg-white px-2 py-1 text-sm">
                         <option value="">— not in file —</option>
                         {p.headers.map((hh) => (
                           <option key={hh} value={hh}>
@@ -140,7 +140,7 @@ export function ImportWizard({ aiEnabled }: { aiEnabled: boolean }) {
           </table>
           <div className="flex items-center gap-3">
             <Pending>{`Import ${p.rowCount} rows`}</Pending>
-            <span className="text-xs text-ink-3">Existing records with the same code or SKU are updated, never duplicated. Re-importing a corrected file is safe.</span>
+            <span className="text-xs text-ink-3">Rows with an existing code or SKU update that record.</span>
           </div>
         </form>
       ) : null}

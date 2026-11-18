@@ -9,7 +9,7 @@ import { formObject, optStr, reqStr, withFormErrors } from "@/lib/forms";
 import type { ActionState } from "@/components/ui/form";
 import { ENTITIES, guessEntity, heuristicMapping, type EntityKind, type Mapping } from "./mapping";
 import { parseSpreadsheet, type Sheet } from "./parse";
-import { adviseWithClaude } from "./ai";
+import { adviseMapping } from "./ai";
 import { runImport, type ImportResult } from "./service";
 
 export type PreviewState = NonNullable<ActionState> & {
@@ -56,7 +56,7 @@ export async function previewImportAction(_prev: PreviewState, formData: FormDat
     let notes: string[] = [];
     let aiModel: string | undefined;
     if (!forcedKind) {
-      const ai = await adviseWithClaude(sheet.headers, sheet.rows.slice(0, 5), guess);
+      const ai = await adviseMapping(sheet.headers, sheet.rows.slice(0, 5), guess);
       if (ai) {
         kind = ai.kind;
         mapping = { ...heuristicMapping(ai.kind, sheet.headers), ...Object.fromEntries(Object.entries(ai.mapping).filter(([, v]) => v)) };

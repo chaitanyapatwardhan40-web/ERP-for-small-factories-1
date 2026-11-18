@@ -21,7 +21,7 @@ export default async function AccountsPage() {
     db.select().from(periods).where(eq(periods.orgId, ctx.orgId)).orderBy(asc(periods.startDate)),
   ]);
   const SubtypeSelect = ({ name, value }: { name: string; value: string }) => (
-    <select name={name} defaultValue={value} className="rounded-md border border-line bg-white px-2 py-1 text-xs">
+    <select name={name} defaultValue={value} className="rounded border border-line bg-white px-2 py-1 text-xs">
       {ACCOUNT_SUBTYPES.map((s) => (
         <option key={s} value={s}>
           {s.replaceAll("_", " ")}
@@ -31,7 +31,7 @@ export default async function AccountsPage() {
   );
   return (
     <>
-      <PageHeader title="Chart of accounts, posting rules, periods" description="Rules point at account subtypes, so renumbering the chart never breaks a posting. Lock a period and nothing can post into it." />
+      <PageHeader title="Chart of accounts" />
       <Tabs tabs={BOOKS_TABS} current="/books/accounts" />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

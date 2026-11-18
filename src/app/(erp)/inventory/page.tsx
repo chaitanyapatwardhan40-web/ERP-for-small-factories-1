@@ -21,7 +21,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader
         title="Inventory"
-        description="Every movement is a transaction; the value here is what the general ledger says."
         actions={
           <>
             <LinkButton href="/inventory/adjust" variant="secondary">

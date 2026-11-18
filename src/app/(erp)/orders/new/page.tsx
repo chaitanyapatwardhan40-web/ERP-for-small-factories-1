@@ -17,7 +17,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   const [customerList, itemList] = await Promise.all([pickCustomers(db, ctx.orgId), pickItems(db, ctx.orgId)]);
   return (
     <>
-      <PageHeader title="New sales order" crumbs={[{ href: "/orders", label: "Sales orders" }]} description="For a customer PO you already have. Use a quote when you need to price first." />
+      <PageHeader title="New sales order" crumbs={[{ href: "/orders", label: "Sales orders" }]} />
       <ActionForm action={createOrderAction} className="space-y-4">
         <Card>
           <FormGrid cols={4}>

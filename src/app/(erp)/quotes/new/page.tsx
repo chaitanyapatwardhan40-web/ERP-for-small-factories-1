@@ -19,7 +19,7 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Pro
   const [customerList, itemList, [org]] = await Promise.all([pickCustomers(db, ctx.orgId), pickItems(db, ctx.orgId), db.select().from(orgs).where(eq(orgs.id, ctx.orgId))]);
   return (
     <>
-      <PageHeader title="New quote" crumbs={[{ href: "/quotes", label: "Quotes" }]} description="Pick an item to pull its rolled-up cost, set a margin, and the price follows. Leave the item blank for a custom line." />
+      <PageHeader title="New quote" crumbs={[{ href: "/quotes", label: "Quotes" }]} />
       <ActionForm action={createQuoteAction} className="space-y-4">
         <Card>
           <FormGrid cols={4}>

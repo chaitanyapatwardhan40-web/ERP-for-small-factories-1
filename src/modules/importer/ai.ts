@@ -4,11 +4,11 @@ import { ENTITIES, type EntityKind, type Mapping } from "./mapping";
 export type AiAdvice = { kind: EntityKind; mapping: Mapping; notes: string[]; model: string };
 
 /**
- * Ask Claude to look at the headers and a few rows and say what the sheet
+ * Ask a language model to look at the headers and a few rows and say what the sheet
  * is and how its columns map. Only called when ANTHROPIC_API_KEY is set;
  * any failure falls back to the heuristics silently.
  */
-export async function adviseWithClaude(headers: string[], sample: Record<string, string>[], guess: EntityKind): Promise<AiAdvice | null> {
+export async function adviseMapping(headers: string[], sample: Record<string, string>[], guess: EntityKind): Promise<AiAdvice | null> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
   try {
@@ -18,7 +18,7 @@ export async function adviseWithClaude(headers: string[], sample: Record<string,
     const catalog = Object.entries(ENTITIES)
       .map(([k, e]) => `${k}: ${e.fields.map((f) => `${f.key}${f.required ? "*" : ""}`).join(", ")}`)
       .join("\n");
-    const prompt = `You are the implementer for a small-factory ERP. A shop uploaded a spreadsheet.
+    const prompt = `You map spreadsheet columns for a manufacturing ERP import. A shop uploaded a spreadsheet.
 
 Headers: ${JSON.stringify(headers)}
 First rows: ${JSON.stringify(sample.slice(0, 5))}

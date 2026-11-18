@@ -22,7 +22,7 @@ export default async function SettingsPage() {
   const s = org.settings;
   return (
     <>
-      <PageHeader title="Settings" description={`${org.name} · ${process.env.DATABASE_URL ? "Postgres" : "embedded database (PGlite)"} · ${process.env.ANTHROPIC_API_KEY ? "AI on" : "AI off (no ANTHROPIC_API_KEY)"}`} />
+      <PageHeader title="Settings" description={org.name} />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card title="Shop">
@@ -115,7 +115,7 @@ export default async function SettingsPage() {
                 Add to shop
               </SubmitButton>
             </ActionForm>
-            <p className="mt-2 text-xs text-ink-3">Roles: owner (everything), office (sell, buy, make), shop (floor and stock), accountant (books), readonly.</p>
+            <p className="mt-2 text-xs text-ink-3">Owner: all. Office: sell, buy, make. Shop: floor and stock. Accountant: books. Read-only.</p>
           </Card>
         </div>
       </div>

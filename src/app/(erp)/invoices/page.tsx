@@ -19,7 +19,7 @@ export default async function InvoicesPage() {
   const t = today();
   return (
     <>
-      <PageHeader title="Invoices and receivables" description="Invoices come from shipments at order prices; payments post to cash." />
+      <PageHeader title="Invoices" />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat label="Open" value={fmtMoney(aging.buckets.total)} />
         <Stat label="Current" value={fmtMoney(aging.buckets.current)} tone="good" />

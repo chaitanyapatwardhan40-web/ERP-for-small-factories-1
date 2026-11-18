@@ -23,7 +23,7 @@ export default async function MaintenancePage() {
   const t = today();
   return (
     <>
-      <PageHeader title="Machines and maintenance" description="Preventive tasks by calendar, and a downtime log that blocks the schedule when a machine is down." />
+      <PageHeader title="Machines and maintenance" />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card title="Machines" padded={false}>

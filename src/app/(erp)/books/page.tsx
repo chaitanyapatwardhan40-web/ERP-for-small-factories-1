@@ -23,7 +23,7 @@ export default async function BooksPage() {
   const credits = balances.reduce((s, b) => s + b.credit, 0);
   return (
     <>
-      <PageHeader title="General ledger" description="Every shipment, receipt, issue, invoice and payment posted here automatically. Manual entries for everything else." />
+      <PageHeader title="General ledger" />
       <Tabs tabs={BOOKS_TABS} current="/books" />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

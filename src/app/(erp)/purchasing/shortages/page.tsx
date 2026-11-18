@@ -17,7 +17,7 @@ export default async function ShortagesPage() {
   const vendorName = (id: string | null) => vendorList.find((v) => v.id === id)?.name;
   return (
     <>
-      <PageHeader title="What to buy" description="Demand from open work orders and confirmed orders, minus stock, minus open POs, topped up to the reorder quantity." crumbs={[{ href: "/purchasing", label: "Purchase orders" }]} />
+      <PageHeader title="What to buy" description="Open demand less stock on hand and open purchase orders." crumbs={[{ href: "/purchasing", label: "Purchase orders" }]} />
       {rows.length ? (
         <form action={createPosFromShortagesAction}>
           <Card padded={false}>

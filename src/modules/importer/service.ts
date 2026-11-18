@@ -16,7 +16,7 @@ const get = (row: Record<string, string>, mapping: Mapping, key: string) => {
 };
 
 /**
- * The implementer's brain, part 2: load rows into the system idempotently.
+ * Import loading: write rows into the system idempotently.
  * Existing records (by code / SKU / name) are updated, not duplicated, so a
  * shop can re-import a corrected sheet without fear.
  */

@@ -49,7 +49,7 @@ export function Card({
   padded?: boolean;
 }) {
   return (
-    <section className={`rounded-lg border border-line bg-white shadow-xs ${className}`}>
+    <section className={`rounded-md border border-line bg-white shadow-xs ${className}`}>
       {title ? (
         <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
           <h2 className="text-sm font-semibold">{title}</h2>
@@ -63,7 +63,7 @@ export function Card({
 
 export function EmptyState({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-line bg-white px-6 py-10 text-center">
+    <div className="rounded-md border border-dashed border-line bg-white px-6 py-10 text-center">
       <p className="text-sm font-medium">{title}</p>
       {hint ? <p className="mt-1 text-sm text-ink-3">{hint}</p> : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
@@ -123,7 +123,7 @@ const statusTone: Record<string, keyof typeof tones> = {
 
 export function Badge({ children, tone }: { children: ReactNode; tone?: keyof typeof tones }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${tones[tone ?? "neutral"]}`}>
+    <span className={`inline-flex items-center rounded border px-1.5 py-px text-[11px] font-medium ${tones[tone ?? "neutral"]}`}>
       {children}
     </span>
   );
@@ -136,7 +136,7 @@ export function StatusBadge({ status }: { status: string }) {
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "good" | "warn" | "bad" }) {
   const color = tone === "good" ? "text-good" : tone === "warn" ? "text-warn" : tone === "bad" ? "text-bad" : "text-ink";
   return (
-    <div className="rounded-lg border border-line bg-white px-4 py-3 shadow-xs">
+    <div className="rounded-md border border-line bg-white px-4 py-3 shadow-xs">
       <div className="text-xs font-medium uppercase tracking-wide text-ink-3">{label}</div>
       <div className={`mt-1 text-2xl font-semibold tabular-nums ${color}`}>{value}</div>
       {hint ? <div className="mt-0.5 text-xs text-ink-3">{hint}</div> : null}

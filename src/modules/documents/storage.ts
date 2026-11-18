@@ -1,16 +1,19 @@
 import "server-only";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { isDemo } from "@/lib/env";
 
 /**
  * File storage with two backends: Vercel Blob when BLOB_READ_WRITE_TOKEN is
- * set (production), the local ./.data/uploads folder otherwise (dev, demos).
+ * set (production), a local folder otherwise: ./.data/uploads in development,
+ * the system temp folder in demo mode (read-only app directory on serverless).
  * The attachment row stores only a storage key; the API route resolves it.
  */
 export type Stored = { key: string; size: number };
 
-const LOCAL_ROOT = path.join(process.cwd(), ".data", "uploads");
+const LOCAL_ROOT = process.env.KITWISE_UPLOAD_DIR ?? (isDemo() ? path.join(os.tmpdir(), "kitwise-uploads") : path.join(process.cwd(), ".data", "uploads"));
 
 export async function storeFile(orgId: string, filename: string, data: Buffer, mime: string): Promise<Stored> {
   const safe = filename.replace(/[^\w.\-]+/g, "_").slice(0, 120);

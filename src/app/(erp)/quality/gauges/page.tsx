@@ -19,7 +19,7 @@ export default async function GaugesPage() {
   const t = today();
   return (
     <>
-      <PageHeader title="Gauges and calibration" description="Every measuring tool, when it was last calibrated and when it is due. ISO 9001 clause 7.1.5 in one list." />
+      <PageHeader title="Gauges and calibration" />
       <Tabs tabs={QUALITY_TABS} current="/quality/gauges" />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card padded={false} className="lg:col-span-2">

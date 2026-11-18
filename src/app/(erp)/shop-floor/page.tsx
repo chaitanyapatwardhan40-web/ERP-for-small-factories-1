@@ -40,7 +40,7 @@ export default async function ShopFloorPage({ searchParams }: { searchParams: Pr
   const shown = wc ? ops.filter((o) => o.op.workCenterId === wc) : ops;
   return (
     <>
-      <PageHeader title="Shop floor" description="Pick your name, find the job, clock in. Clock out with what you made." />
+      <PageHeader title="Shop floor" />
       <div className="mb-4 flex flex-wrap gap-1">
         <Link href="/shop-floor" className={`rounded-full border px-3 py-1.5 text-sm ${!wc ? "border-brand bg-brand-soft text-brand-dark" : "border-line bg-white"}`}>
           All work centers
@@ -55,7 +55,7 @@ export default async function ShopFloorPage({ searchParams }: { searchParams: Pr
         <Card title="Clocked in now" className="mb-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {open.map(({ l, emp, opName, woNumber, woId }) => (
-              <div key={l.id} className="rounded-md border border-warn/30 bg-warn-soft p-3">
+              <div key={l.id} className="rounded border border-warn/30 bg-warn-soft p-3">
                 <div className="flex items-center justify-between">
                   <div className="font-semibold">{emp}</div>
                   <div className="text-xs text-ink-3">since {fmtDateTime(l.startedAt)}</div>
@@ -129,7 +129,7 @@ export default async function ShopFloorPage({ searchParams }: { searchParams: Pr
             </div>
           </Card>
         ))}
-        {!shown.length ? <p className="text-sm text-ink-3">No open operations{wc ? " at this work center" : ""}. Release a work order to see jobs here.</p> : null}
+        {!shown.length ? <p className="text-sm text-ink-3">No open operations{wc ? " at this work center" : ""}.</p> : null}
       </div>
     </>
   );

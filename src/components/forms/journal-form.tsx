@@ -25,7 +25,7 @@ export function JournalForm({ accounts, defaultDate }: { accounts: Acct[]; defau
       </div>
       {lines.map((l, i) => (
         <div key={l.key} className="grid grid-cols-[1fr_5rem_5rem] gap-1">
-          <select name={`lines[${i}][accountId]`} value={l.accountId} onChange={(e) => update(l.key, { accountId: e.target.value })} className="rounded-md border border-line bg-white px-2 py-1 text-sm" required>
+          <select name={`lines[${i}][accountId]`} value={l.accountId} onChange={(e) => update(l.key, { accountId: e.target.value })} className="rounded border border-line bg-white px-2 py-1 text-sm" required>
             <option value="">Account</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -33,8 +33,8 @@ export function JournalForm({ accounts, defaultDate }: { accounts: Acct[]; defau
               </option>
             ))}
           </select>
-          <input name={`lines[${i}][debit]`} type="number" step="0.01" placeholder="Dr" value={l.debit} onChange={(e) => update(l.key, { debit: e.target.value })} className="rounded-md border border-line px-2 py-1 text-right text-sm" />
-          <input name={`lines[${i}][credit]`} type="number" step="0.01" placeholder="Cr" value={l.credit} onChange={(e) => update(l.key, { credit: e.target.value })} className="rounded-md border border-line px-2 py-1 text-right text-sm" />
+          <input name={`lines[${i}][debit]`} type="number" step="0.01" placeholder="Dr" value={l.debit} onChange={(e) => update(l.key, { debit: e.target.value })} className="rounded border border-line px-2 py-1 text-right text-sm" />
+          <input name={`lines[${i}][credit]`} type="number" step="0.01" placeholder="Cr" value={l.credit} onChange={(e) => update(l.key, { credit: e.target.value })} className="rounded border border-line px-2 py-1 text-right text-sm" />
         </div>
       ))}
       <div className="flex items-center justify-between text-xs">

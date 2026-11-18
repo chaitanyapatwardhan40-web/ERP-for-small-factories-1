@@ -142,7 +142,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                   <Input name="customerPo" placeholder="Customer PO number (optional)" />
                   <SubmitButton className="w-full">Accept and create sales order</SubmitButton>
                 </ActionForm>
-                <p className="mt-2 text-xs text-ink-3">Every line needs an item to convert. Custom lines: create the item first, then edit the quote line.</p>
+                <p className="mt-2 text-xs text-ink-3">Each line needs an item before the quote can be converted.</p>
               </Card>
               <Card title="Lost it?">
                 <form action={quoteStatusAction} className="flex gap-2">

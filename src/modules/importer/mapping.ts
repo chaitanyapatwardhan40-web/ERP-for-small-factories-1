@@ -1,6 +1,6 @@
 /**
- * The implementer's brain, part 1: which spreadsheet is this, and which
- * column is which field. Heuristics first (free, instant); Claude refines
+ * Import mapping: which spreadsheet is this, and which
+ * column is which field. Heuristics first (free, instant); a language model refines
  * when ANTHROPIC_API_KEY is set.
  */
 

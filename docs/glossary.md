@@ -44,4 +44,4 @@ The words the code uses, in the sense a shop uses them.
 - **Lot** — a traceable batch (heat number, PO receipt, work order number).
 - **Reactivation radar** — customers with no order in N months and what they used to buy.
 - **Implementer** — the import wizard that reads a shop's spreadsheets, recognises what they are,
-  maps the columns (heuristics, or Claude when a key is set) and loads them idempotently.
+  maps the columns (header heuristics, or a language model when an API key is set) and loads them idempotently.

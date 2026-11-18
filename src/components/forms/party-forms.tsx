@@ -6,7 +6,7 @@ import { saveCustomerAction, saveVendorAction } from "@/modules/parties/actions"
 
 function AddressFields({ prefix, value, title }: { prefix: string; value?: Address | null; title: string }) {
   return (
-    <fieldset className="rounded-md border border-line p-3">
+    <fieldset className="rounded border border-line p-3">
       <legend className="px-1 text-xs font-medium text-ink-2">{title}</legend>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Street" className="md:col-span-2">

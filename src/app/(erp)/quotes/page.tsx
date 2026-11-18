@@ -24,7 +24,7 @@ export default async function QuotesPage() {
   const winRate = decided.length ? Math.round((won.length / decided.length) * 100) : null;
   return (
     <>
-      <PageHeader title="Quotes" description="Cost build-up, margin, and one click to a sales order." actions={<LinkButton href="/quotes/new">New quote</LinkButton>} />
+      <PageHeader title="Quotes" actions={<LinkButton href="/quotes/new">New quote</LinkButton>} />
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Stat label="Open quotes" value={open.length} hint={fmtMoney(open.reduce((s, r) => s + Number(r.q.subtotal), 0))} />
         <Stat label="Won" value={won.length} hint={fmtMoney(won.reduce((s, r) => s + Number(r.q.subtotal), 0))} tone="good" />

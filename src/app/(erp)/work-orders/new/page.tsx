@@ -16,7 +16,7 @@ export default async function NewWorkOrderPage({ searchParams }: { searchParams:
   const makeItems = (await pickItems(db, ctx.orgId)).filter((i) => i.type === "make");
   return (
     <>
-      <PageHeader title="New work order" crumbs={[{ href: "/work-orders", label: "Work orders" }]} description="For stock or a special. Orders for customers get their work orders from the sales order." />
+      <PageHeader title="New work order" crumbs={[{ href: "/work-orders", label: "Work orders" }]} />
       <Card>
         <ActionForm action={createWorkOrderAction} className="space-y-4">
           <FormGrid cols={4}>

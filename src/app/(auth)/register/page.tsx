@@ -3,13 +3,13 @@ import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, Input } from "@/components/ui/fields";
 import { registerAction } from "@/modules/platform/actions";
 
-export const metadata = { title: "Create your shop" };
+export const metadata = { title: "Create a workspace" };
 
 export default function RegisterPage() {
   return (
     <ActionForm action={registerAction} className="space-y-4">
-      <Field label="Shop name">
-        <Input name="shopName" required placeholder="Acme Precision LLC" />
+      <Field label="Company name">
+        <Input name="shopName" required placeholder="Northline Kitting & Assembly" />
       </Field>
       <Field label="Your name">
         <Input name="name" required autoComplete="name" />
@@ -20,7 +20,7 @@ export default function RegisterPage() {
       <Field label="Password" hint="At least 8 characters">
         <Input name="password" type="password" required minLength={8} autoComplete="new-password" />
       </Field>
-      <SubmitButton className="w-full">Create shop</SubmitButton>
+      <SubmitButton className="w-full">Create workspace</SubmitButton>
       <p className="text-center text-sm text-ink-3">
         Already have an account?{" "}
         <Link href="/login" className="text-brand hover:underline">

@@ -13,7 +13,7 @@ export default async function ShipmentsPage() {
   const rows = await listShipments(db, ctx.orgId);
   return (
     <>
-      <PageHeader title="Shipments" description="Pack from an order, ship, invoice. Stock leaves at average cost when you ship." />
+      <PageHeader title="Shipments" />
       {rows.length ? (
         <Card padded={false}>
           <table className="data">

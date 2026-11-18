@@ -17,7 +17,7 @@ export default async function DocumentsPage() {
   const rows = await db.select({ a: attachments, by: users.name }).from(attachments).leftJoin(users, eq(users.id, attachments.uploadedBy)).where(eq(attachments.orgId, ctx.orgId)).orderBy(desc(attachments.createdAt)).limit(300);
   return (
     <>
-      <PageHeader title="Documents and drawings" description="Every file attached to an item, job, customer or vendor, with its revision. Upload from the record it belongs to." />
+      <PageHeader title="Documents" />
       {rows.length ? (
         <Card padded={false}>
           <table className="data">

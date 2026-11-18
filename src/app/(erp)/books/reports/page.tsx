@@ -40,14 +40,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   );
   return (
     <>
-      <PageHeader title="Reports" description="Straight from the ledger and the job records. Nothing is re-keyed." />
+      <PageHeader title="Reports" />
       <Tabs tabs={BOOKS_TABS} current="/books/reports" />
       <form className="mb-4 flex items-center gap-2 text-sm">
         <span className="text-ink-3">Period</span>
-        <input type="date" name="from" defaultValue={from} className="rounded-md border border-line bg-white px-2 py-1" />
+        <input type="date" name="from" defaultValue={from} className="rounded border border-line bg-white px-2 py-1" />
         <span className="text-ink-3">to</span>
-        <input type="date" name="to" defaultValue={to} className="rounded-md border border-line bg-white px-2 py-1" />
-        <button className="rounded-md border border-line bg-white px-3 py-1">Run</button>
+        <input type="date" name="to" defaultValue={to} className="rounded border border-line bg-white px-2 py-1" />
+        <button className="rounded border border-line bg-white px-3 py-1">Run</button>
       </form>
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Net income" value={fmtMoney(pnl.netIncome)} tone={pnl.netIncome >= 0 ? "good" : "bad"} hint={`${fmtDate(from)} – ${fmtDate(to)}`} />
@@ -85,7 +85,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </tr>
             </tbody>
           </table>
-          <p className="px-3 py-2 text-xs text-ink-3">Labour and overhead absorbed show as negative expenses: they moved payroll cost into WIP and then into inventory and COGS.</p>
         </Card>
         <Card title={`Balance sheet · as of ${fmtDate(to)}`} padded={false}>
           <table className="data">

@@ -15,7 +15,7 @@ export default async function SchedulePage() {
   const total = board.reduce((s, b) => s + b.operations.length, 0);
   return (
     <>
-      <PageHeader title="Schedule board" description="Open operations per work center in priority then due-date order. Load is planned hours still to run against daily capacity." />
+      <PageHeader title="Schedule" />
       {total ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {board.map(({ workCenter, operations, loadHours, daysOfWork }) => (

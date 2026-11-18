@@ -24,7 +24,7 @@ export default async function PeoplePage() {
   ]);
   return (
     <>
-      <PageHeader title="People" description="Who clocks time on the floor, at what rate. Hours feed job cost; the skills list is your training matrix." />
+      <PageHeader title="Employees" />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card padded={false} className="lg:col-span-2">
           <table className="data">
@@ -77,7 +77,6 @@ export default async function PeoplePage() {
             </FormGrid>
             <SubmitButton>Save</SubmitButton>
           </ActionForm>
-          <p className="mt-3 text-xs text-ink-3">Payroll itself stays in Gusto or your payroll provider; export hours from the labour log.</p>
         </Card>
       </div>
     </>

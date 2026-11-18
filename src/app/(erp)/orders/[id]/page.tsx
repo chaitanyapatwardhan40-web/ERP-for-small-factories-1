@@ -259,7 +259,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 </label>
                 <SubmitButton className="w-full">Ship in full</SubmitButton>
               </ActionForm>
-              <p className="mt-2 text-xs text-ink-3">Stock leaves at average cost; COGS, inventory, receivables and revenue post in the same transaction.</p>
             </Card>
           ) : null}
           {open ? (

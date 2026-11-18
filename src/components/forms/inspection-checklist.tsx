@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/fields";
 
 /** Server-rendered checklist rows; names follow results[i][field]. */
 export function InspectionChecklist({ checklist }: { checklist: ChecklistItem[] }) {
-  if (!checklist.length) return <p className="text-sm text-ink-3">This plan has no checks; the result is pass unless you reject quantity.</p>;
+  if (!checklist.length) return <p className="text-sm text-ink-3">No checks on this plan.</p>;
   return (
     <table className="data">
       <thead>

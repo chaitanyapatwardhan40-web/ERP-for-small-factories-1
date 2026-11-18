@@ -16,7 +16,7 @@ export default async function LocationsPage() {
   const rows = await db.select().from(locations).where(eq(locations.orgId, ctx.orgId)).orderBy(asc(locations.code));
   return (
     <>
-      <PageHeader title="Stock locations" description="Where stock lives: racks, the floor, the shipping dock, quarantine." />
+      <PageHeader title="Stock locations" />
       <Tabs tabs={ITEM_TABS} current="/items/locations" />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card padded={false} className="lg:col-span-2">
