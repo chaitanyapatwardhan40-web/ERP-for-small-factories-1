@@ -1,10 +1,12 @@
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import {
+  attachments,
   employees,
   items,
   laborEntries,
   locations,
+  purchaseOrders,
   routingOperations,
   salesOrderLines,
   salesOrders,
@@ -360,6 +362,53 @@ export async function cancelWorkOrder(db: DbOrTx, actor: Actor, workOrderId: str
   const wo = await getWo(db, actor.orgId, workOrderId);
   if (Number(wo.materialCost) + Number(wo.laborCost) > 0) throw new ProductionError("Work orders with cost on them must be completed, not cancelled");
   await db.update(workOrders).set({ status: "cancelled", updatedAt: new Date() }).where(eq(workOrders.id, wo.id));
+}
+
+/**
+ * Remove a work order nothing has happened on: no material issued, no labor,
+ * no completions, no outside-processing PO. Once work starts it is completed
+ * or cancelled instead.
+ */
+export async function deleteWorkOrder(db: DbOrTx, actor: Actor, workOrderId: string) {
+  const wo = await getWo(db, actor.orgId, workOrderId);
+  if (!["planned", "released", "cancelled"].includes(wo.status)) {
+    throw new ProductionError(`${wo.number} is ${wo.status.replaceAll("_", " ")}. Complete or cancel it instead of deleting`);
+  }
+  const cost = Number(wo.materialCost) + Number(wo.laborCost) + Number(wo.outsideCost) + Number(wo.overheadCost);
+  if (cost > 0 || Number(wo.qtyComplete) > 0 || Number(wo.qtyScrap) > 0) {
+    throw new ProductionError(`${wo.number} has cost or completions on it and cannot be deleted`);
+  }
+  const ops = (await db.select({ id: workOrderOperations.id }).from(workOrderOperations).where(eq(workOrderOperations.workOrderId, wo.id))).map((o) => o.id);
+  if (ops.length) {
+    const [lc] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(laborEntries).where(inArray(laborEntries.workOrderOperationId, ops));
+    if (lc?.n) throw new ProductionError(`${wo.number} has labor on it and cannot be deleted`);
+  }
+  const [pc] = await db
+    .select({ n: sql<number>`count(*)`.mapWith(Number) })
+    .from(purchaseOrders)
+    .where(and(eq(purchaseOrders.orgId, actor.orgId), eq(purchaseOrders.workOrderId, wo.id)));
+  if (pc?.n) throw new ProductionError(`${wo.number} has an outside-processing PO and cannot be deleted`);
+  await db.delete(attachments).where(and(eq(attachments.orgId, actor.orgId), eq(attachments.entityType, "work-order"), eq(attachments.entityId, wo.id)));
+  await db.delete(workOrders).where(eq(workOrders.id, wo.id));
+  await audit(db, { ...actor, action: "wo.delete", entityType: "wo", entityId: wo.id, data: { number: wo.number, itemId: wo.itemId, status: wo.status } });
+  if (wo.salesOrderLineId) {
+    // An order with no live work orders left goes back to confirmed.
+    const [line] = await db.select({ orderId: salesOrderLines.orderId }).from(salesOrderLines).where(eq(salesOrderLines.id, wo.salesOrderLineId));
+    if (line) {
+      const remaining = await db
+        .select({ id: workOrders.id })
+        .from(workOrders)
+        .innerJoin(salesOrderLines, eq(salesOrderLines.id, workOrders.salesOrderLineId))
+        .where(and(eq(salesOrderLines.orderId, line.orderId), ne(workOrders.status, "cancelled")));
+      if (!remaining.length) {
+        await db
+          .update(salesOrders)
+          .set({ status: "confirmed", updatedAt: new Date() })
+          .where(and(eq(salesOrders.id, line.orderId), eq(salesOrders.status, "in_production")));
+      }
+    }
+  }
+  return wo;
 }
 
 /** The schedule board: open operations per work centre with load vs capacity. */

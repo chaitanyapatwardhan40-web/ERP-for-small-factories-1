@@ -29,7 +29,15 @@ export default async function TodayPage() {
   ]);
   return (
     <>
-      <PageHeader title="Today" description={`${ctx.session.org!.name} · ${fmtDate(s.date)}`} />
+      <PageHeader
+        title="Today"
+        description={`${ctx.session.org!.name} · ${fmtDate(s.date)}`}
+        actions={
+          <Link href="/walkthrough" className="text-sm text-brand hover:underline">
+            New here? Follow one job from quote to cash →
+          </Link>
+        }
+      />
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Late orders" value={s.late.length} tone={s.late.length ? "bad" : "good"} hint={`${s.dueThisWeek.length} due this week`} />
         <Stat label="Open backlog" value={fmtMoney(s.backlog)} hint={`${s.openOrders.length} open orders`} />

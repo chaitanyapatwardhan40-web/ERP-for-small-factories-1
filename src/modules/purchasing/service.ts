@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import {
+  attachments,
   inventoryTransactions,
   items,
   orgs,
@@ -235,6 +236,27 @@ export async function setPoStatus(
       .where(eq(purchaseOrderLines.poId, poId));
   }
   await audit(db, { ...actor, action: `po.${status}`, entityType: "po", entityId: poId, data: extra.reason ? { reason: extra.reason } : undefined });
+}
+
+/**
+ * Remove a PO nothing has happened on: nothing received, nothing billed.
+ * Once goods or bills exist the PO is cancelled or closed short so the paper
+ * trail stays; the audit log keeps the number either way.
+ */
+export async function deletePurchaseOrder(db: DbOrTx, actor: Actor, poId: string) {
+  const [po] = await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, poId), eq(purchaseOrders.orgId, actor.orgId)));
+  if (!po) throw new PurchasingError("PO not found");
+  if (["partially_received", "received", "closed"].includes(po.status)) {
+    throw new PurchasingError(`${po.number} is ${po.status.replaceAll("_", " ")}. Close it instead of deleting`);
+  }
+  const [rc] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(receipts).where(eq(receipts.poId, poId));
+  if (rc?.n) throw new PurchasingError(`${po.number} has receipts against it and cannot be deleted`);
+  const [bc] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(vendorBills).where(eq(vendorBills.poId, poId));
+  if (bc?.n) throw new PurchasingError(`${po.number} has bills against it and cannot be deleted`);
+  await db.delete(attachments).where(and(eq(attachments.orgId, actor.orgId), eq(attachments.entityType, "po"), eq(attachments.entityId, poId)));
+  await db.delete(purchaseOrders).where(eq(purchaseOrders.id, poId));
+  await audit(db, { ...actor, action: "po.delete", entityType: "po", entityId: poId, data: { number: po.number, vendorId: po.vendorId, status: po.status } });
+  return po;
 }
 
 export type ReceiveLine = { poLineId: string; qty: number; lotNumber?: string | null; locationId: string };

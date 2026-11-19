@@ -4,7 +4,7 @@ import { createTestDb, type Db } from "@/lib/db";
 import { customerPrices, customers, invoices, items, journalLines, locations, orgs, purchaseOrderLines, users, vendorItems, vendors } from "@/lib/db/schema";
 import { balanceOfSubtype, seedBooks } from "@/modules/books/service";
 import { createBillFromPo, createPurchaseOrder, receivePurchaseOrder, setPoStatus, shortageReport, updatePurchaseOrder, upsertVendorItem } from "@/modules/purchasing/service";
-import { addOrderLine, cancelOrderLine, confirmOrder, createOrder, resolveSalesPrice, SalesError } from "@/modules/sales/service";
+import { addOrderLine, cancelOrder, cancelOrderLine, confirmOrder, createOrder, resolveSalesPrice, SalesError } from "@/modules/sales/service";
 import { createCreditMemo, createInvoiceFromShipment, recordCustomerPayment, shipOrderInFull, voidInvoice } from "@/modules/shipping/service";
 import { importBankLines, autoMatchBank, bankSummary, postTemplate, saveTemplate, salesTaxReport } from "@/modules/books/extras";
 import { inventoryLedgerValue } from "@/modules/inventory/service";
@@ -102,6 +102,14 @@ describe("sales depth", () => {
     expect(await resolveSalesPrice(db, actor.orgId, id.cust, id.bolt, 10, D)).toBe(4);
     expect(await resolveSalesPrice(db, actor.orgId, id.cust, id.bolt, 60, D)).toBe(3.5);
     expect(await resolveSalesPrice(db, actor.orgId, null, id.bolt, 10, D)).toBe(4.5);
+    // The editor gets the same answer from the hints without a round trip.
+    const { priceHintsFor } = await import("@/modules/sales/service");
+    const { hintPrice } = await import("@/components/forms/line-editor");
+    const hints = await priceHintsFor(db, actor.orgId, id.cust, D);
+    expect(hints[id.bolt].price).toBe(4);
+    expect(hintPrice(hints[id.bolt], 10)).toBe(4);
+    expect(hintPrice(hints[id.bolt], 60)).toBe(3.5);
+    expect(hintPrice((await priceHintsFor(db, actor.orgId, null, D))[id.bolt], 60)).toBe(4.5);
   });
 
   it("creates an order with list prices and the customer's standard discount, then enforces the credit limit", async () => {
@@ -169,5 +177,88 @@ describe("books depth", () => {
     const s = await bankSummary(db, actor.orgId);
     expect(s.unmatched).toBe(0);
     expect(await balanced()).toBe(true);
+  });
+});
+
+describe("deleting drafts", () => {
+  it("removes draft POs, quotes, orders and planned work orders, and refuses anything further along", async () => {
+    const { deletePurchaseOrder, PurchasingError } = await import("@/modules/purchasing/service");
+    const { createQuote, deleteQuote, deleteOrder, acceptQuote } = await import("@/modules/sales/service");
+    const { createWorkOrder, deleteWorkOrder, createWorkOrdersForOrder, releaseWorkOrder, ProductionError } = await import("@/modules/production/service");
+    const { purchaseOrders, quotes, salesOrders, workOrders } = await import("@/lib/db/schema");
+
+    // A draft PO goes; the received one from earlier does not.
+    const draft = await createPurchaseOrder(db, actor, { vendorId: id.vend, orderDate: D, lines: [{ itemId: id.bolt, qty: 5 }] });
+    await deletePurchaseOrder(db, actor, draft.id);
+    expect((await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, draft.id))).length).toBe(0);
+    await expect(deletePurchaseOrder(db, actor, id.po)).rejects.toThrow(PurchasingError);
+
+    // A quote goes until an order is made from it.
+    const q1 = await createQuote(db, actor, { customerId: id.cust, quoteDate: D, lines: [{ itemId: id.bolt, description: "Bolt", qty: 10 }] });
+    await deleteQuote(db, actor, q1.id);
+    expect((await db.select().from(quotes).where(eq(quotes.id, q1.id))).length).toBe(0);
+    const q2 = await createQuote(db, actor, { customerId: id.cust, quoteDate: D, lines: [{ itemId: id.bolt, description: "Bolt", qty: 10 }] });
+    const fromQuote = await acceptQuote(db, actor, q2.id);
+    await expect(deleteQuote(db, actor, q2.id)).rejects.toThrow(SalesError);
+
+    // A make item, an order with a work order on it: the order is blocked until the WO goes.
+    const [widget] = await db.insert(items).values({ orgId: actor.orgId, sku: "WIDGET", name: "Widget", type: "make", standardCost: 20, salesPrice: 50 }).returning();
+    const order = await createOrder(db, actor, { customerId: id.cust, orderDate: D, lines: [{ itemId: widget.id, qty: 2 }] });
+    await confirmOrder(db, actor, order.id);
+    const [wo] = await createWorkOrdersForOrder(db, actor, order.id);
+    expect((await db.select().from(salesOrders).where(eq(salesOrders.id, order.id)))[0].status).toBe("in_production");
+    await expect(deleteOrder(db, actor, order.id)).rejects.toThrow(/work orders/);
+    await deleteWorkOrder(db, actor, wo.id);
+    expect((await db.select().from(workOrders).where(eq(workOrders.id, wo.id))).length).toBe(0);
+    expect((await db.select().from(salesOrders).where(eq(salesOrders.id, order.id)))[0].status).toBe("confirmed");
+    // A cancelled order with a work order still on it waits for the work order.
+    const [again] = await createWorkOrdersForOrder(db, actor, order.id);
+    await cancelOrder(db, actor, order.id, "customer pulled it");
+    await expect(deleteOrder(db, actor, order.id)).rejects.toThrow(/work orders/);
+    await deleteWorkOrder(db, actor, again.id);
+    await deleteOrder(db, actor, order.id);
+    expect((await db.select().from(salesOrders).where(eq(salesOrders.id, order.id))).length).toBe(0);
+    // The draft made from the quote can go too.
+    await deleteOrder(db, actor, fromQuote.id);
+    expect((await db.select().from(salesOrders).where(eq(salesOrders.id, fromQuote.id))).length).toBe(0);
+
+    // A released work order with nothing on it can still go; one that has started cannot.
+    const wo2 = await createWorkOrder(db, actor, { itemId: widget.id, qty: 1 });
+    await releaseWorkOrder(db, actor, wo2.id);
+    await deleteWorkOrder(db, actor, wo2.id);
+    const wo3 = await createWorkOrder(db, actor, { itemId: widget.id, qty: 1 });
+    await db.update(workOrders).set({ status: "in_progress" }).where(eq(workOrders.id, wo3.id));
+    await expect(deleteWorkOrder(db, actor, wo3.id)).rejects.toThrow(ProductionError);
+  });
+});
+
+describe("leads", () => {
+  it("carries a lead through quoting to won, reusing the existing customer", async () => {
+    const { leads } = await import("@/lib/db/schema");
+    const { createQuote, acceptQuote, setQuoteStatus } = await import("@/modules/sales/service");
+    const [lead] = await db.insert(leads).values({ orgId: actor.orgId, company: "Credit Co", stage: "contacted" }).returning();
+    const q = await createQuote(db, actor, { customerId: id.cust, quoteDate: D, leadId: lead.id, lines: [{ itemId: id.bolt, description: "Bolt", qty: 10 }] });
+    let [l] = await db.select().from(leads).where(eq(leads.id, lead.id));
+    expect(l.stage).toBe("quoting");
+    expect(l.customerId).toBe(id.cust);
+    await acceptQuote(db, actor, q.id, "PO-9");
+    [l] = await db.select().from(leads).where(eq(leads.id, lead.id));
+    expect(l.stage).toBe("won");
+    const q2 = await createQuote(db, actor, { customerId: id.cust, quoteDate: D, leadId: lead.id, lines: [{ itemId: id.bolt, description: "Bolt", qty: 1 }] });
+    await setQuoteStatus(db, actor, q2.id, "lost", "too slow");
+    [l] = await db.select().from(leads).where(eq(leads.id, lead.id));
+    expect(l.stage).toBe("lost");
+    expect(l.lostReason).toBe("too slow");
+  });
+});
+
+describe("assistant", () => {
+  it("reads amounts but not the digits of document numbers", async () => {
+    const { parseMoney } = await import("@/modules/assistant/parse");
+    expect(parseMoney("payment on INV-00086")).toBeNull();
+    expect(parseMoney("pay BILL-00012")).toBeNull();
+    expect(parseMoney("payment 12.50 on INV-00086")).toBe(12.5);
+    expect(parseMoney("pay $1,250 on bill 00012")).toBe(1250);
+    expect(parseMoney("paid 500")).toBe(500);
   });
 });

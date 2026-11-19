@@ -10,8 +10,8 @@ import { today } from "@/lib/money";
 
 export const metadata = { title: "New quote" };
 
-export default async function NewQuotePage({ searchParams }: { searchParams: Promise<{ customerId?: string }> }) {
-  const { customerId } = await searchParams;
+export default async function NewQuotePage({ searchParams }: { searchParams: Promise<{ customerId?: string; leadId?: string }> }) {
+  const { customerId, leadId } = await searchParams;
   const ctx = await requireOrg();
   const db = await getDb();
   const [customerList, itemList, [org], hints] = await Promise.all([pickCustomers(db, ctx.orgId), pickItems(db, ctx.orgId), db.select().from(orgs).where(eq(orgs.id, ctx.orgId)), priceHintsFor(db, ctx.orgId, customerId ?? null, today())]);
@@ -21,7 +21,7 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Pro
       <QuoteForm
         customers={customerList}
         items={itemList}
-        defaults={{ customerId }}
+        defaults={{ customerId, leadId }}
         defaultMarginPct={org?.settings.defaultMarginPct ?? 30}
         overheadPct={org?.settings.overheadPct ?? 0}
         priceHints={hints}

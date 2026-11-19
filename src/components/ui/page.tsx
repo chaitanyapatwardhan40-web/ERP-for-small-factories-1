@@ -1,5 +1,6 @@
 import Link from "@/components/ui/link";
 import type { ReactNode } from "react";
+import { BackLink } from "@/components/layout/back-link";
 
 export function PageHeader({
   title,
@@ -15,18 +16,7 @@ export function PageHeader({
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div>
-        {crumbs?.length ? (
-          <div className="mb-1 flex items-center gap-1 text-xs text-ink-3">
-            {crumbs.map((c, i) => (
-              <span key={c.href} className="flex items-center gap-1">
-                {i > 0 ? <span>/</span> : null}
-                <Link href={c.href} className="hover:text-ink">
-                  {c.label}
-                </Link>
-              </span>
-            ))}
-          </div>
-        ) : null}
+        <BackLink crumbs={crumbs} />
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {description ? <p className="mt-1 text-sm text-ink-2">{description}</p> : null}
       </div>

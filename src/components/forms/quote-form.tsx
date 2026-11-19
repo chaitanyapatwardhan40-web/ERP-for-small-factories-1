@@ -3,7 +3,7 @@ import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, FormGrid, Input, Select, Textarea } from "@/components/ui/fields";
 import { Card } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
-import { LineEditor, type LineRow, type PickItem } from "@/components/forms/line-editor";
+import { LineEditor, type LineRow, type PickItem, type PriceHint } from "@/components/forms/line-editor";
 import { createQuoteAction, updateQuoteAction } from "@/modules/sales/actions";
 import { addDays, today } from "@/lib/money";
 
@@ -22,10 +22,10 @@ export function QuoteForm({
   items: PickItem[];
   quote?: typeof quotes.$inferSelect;
   lines?: (typeof quoteLines.$inferSelect)[];
-  defaults?: { customerId?: string };
+  defaults?: { customerId?: string; leadId?: string };
   defaultMarginPct: number;
   overheadPct: number;
-  priceHints?: Record<string, { price: number }>;
+  priceHints?: Record<string, PriceHint>;
   standardTerms?: string | null;
 }) {
   const initial: Partial<LineRow>[] | undefined = lines?.length
@@ -46,6 +46,7 @@ export function QuoteForm({
   return (
     <ActionForm action={quote ? updateQuoteAction : createQuoteAction} className="space-y-4">
       {quote ? <input type="hidden" name="id" value={quote.id} /> : null}
+      {defaults?.leadId ? <input type="hidden" name="leadId" value={defaults.leadId} /> : null}
       <Card>
         <FormGrid cols={4}>
           <Field label="Customer">

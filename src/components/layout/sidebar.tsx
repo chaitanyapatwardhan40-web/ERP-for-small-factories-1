@@ -7,7 +7,13 @@ import { Mark } from "@/components/brand";
 export type NavGroup = { label: string; items: { href: string; label: string }[] };
 
 export const NAV: NavGroup[] = [
-  { label: "", items: [{ href: "/", label: "Today" }] },
+  {
+    label: "",
+    items: [
+      { href: "/", label: "Today" },
+      { href: "/walkthrough", label: "Walkthrough" },
+    ],
+  },
   {
     label: "Sell",
     items: [

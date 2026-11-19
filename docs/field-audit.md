@@ -2,6 +2,12 @@
 
 Every screen, what it holds, what the second build added, and what is still missing. "Fields" are what the record stores and the form edits; "Actions" are what a user can do from the screen. Items under "Not yet" are known gaps, not bugs.
 
+## Everywhere
+
+- Back link at the top of every screen below a list: the list it belongs to, or the record above an edit page. Lists and top-level screens have none; the sidebar is their navigation.
+- Delete, folded away at the bottom of the side column, on quotes, sales orders, work orders and purchase orders that nothing has happened on (nothing received, shipped, invoiced, billed, issued or clocked). Anything further along is cancelled or closed so the paper trail stays; the audit log keeps the number and who deleted it. The assistant does the same with "delete this" after confirmation.
+- Walkthrough (`/walkthrough`, also "New here?" on Today): one job from lead to cash on the sample company, each step with where to click, what to type and what changed in the books.
+
 ## Sell
 
 ### Customers (`/customers`, `/customers/[id]`, `/customers/[id]/edit`)
@@ -14,19 +20,19 @@ Every screen, what it holds, what the second build added, and what is still miss
 ### Leads (`/crm`, `/crm/[id]`)
 - Fields: company, contact, email, phone, source, stage, estimated value, next action + date, expected close, lost reason, notes, owner.
 - Actions: change stage (lost reason captured), convert to customer, campaigns, reactivation list of quiet customers with an email draft, log activity.
-- Added: expected close, lost reason, dated follow-ups that surface on Today.
-- Not yet: email sending, pipeline forecast weighting, duplicate detection.
+- Added: expected close, lost reason, dated follow-ups that surface on Today; "New quote" on a lead links the quote to the lead and reuses an existing customer with the same name instead of creating a duplicate; the lead moves to quoting, then won (quote accepted) or lost (quote lost, reason copied); the lead page lists its quotes.
+- Not yet: email sending, pipeline forecast weighting, duplicate detection beyond an exact name match.
 
 ### Quotes (`/quotes`, `/quotes/new`, `/quotes/[id]`, `/quotes/[id]/edit`, print)
 - Fields: customer, attention, RFQ number, quote date, valid until, quote discount %, revision, status, terms and conditions, notes; per line: item or custom description, qty, material/labour/outside/overhead cost, margin %, unit price (derived or typed), line discount %, lead time.
 - Actions: create, edit (sent quotes get a new revision), mark sent, mark lost with reason, accept into a sales order (carries discounts and lead times), print, automatic expiry of sent quotes past their date, status filter, search, CSV export.
-- Added: attention, terms, discounts, edit with revisions, expiry, filters.
+- Added: attention, terms, discounts, edit with revisions, expiry, filters, link to the lead it answers; the line editor applies quantity breaks from the price lists as the quantity changes (a typed price stays); delete for quotes that were not accepted.
 - Not yet: quote-to-order line mapping for custom lines (create the item first), alternates/options on a quote, emailing from the app.
 
 ### Sales orders (`/orders`, `/orders/new`, `/orders/[id]`, `/orders/[id]/edit`, acknowledgement print)
 - Fields: customer, customer PO, program, order date, requested date, promised date, terms, ship via, ship-to address, freight to invoice, order discount %, sales rep, notes, internal notes, hold reason; per line: item, description, qty, unit price (from the price list when blank), line discount %, promised date, notes, shipped/invoiced/cancelled quantities.
 - Actions: confirm (credit hold and credit limit checks; owner override), edit while draft, logged header changes after confirmation, change a line (qty, price, discount, date) with a reason, add a line, cancel the open quantity of a line, cancel the order, create work orders, pack a shipment, ship in full and invoice, attachments, print acknowledgement with bill-to and ship-to, search and export.
-- Added: requested date, terms, ship via, ship-to, freight, discounts, rep, internal notes, hold/credit logic, draft edit, header edit, add/cancel lines, attachments.
+- Added: requested date, terms, ship via, ship-to, freight, discounts, rep, internal notes, hold/credit logic, draft edit, header edit, add/cancel lines, attachments; the Work orders card shows each job's completion, operations done and due date with a progress bar; delete for orders nothing has happened on.
 - Not yet: blanket orders with releases, backorder allocation rules, commissions, EDI.
 
 ## Make
@@ -133,4 +139,4 @@ Every screen, what it holds, what the second build added, and what is still miss
 - Documents: files with revisions attached to items, work orders, orders and POs.
 - Import: CSV/Excel for customers, vendors, items, BOMs, work centers, stock counts and employees with column mapping and safe re-import.
 - Assistant ("Ask", Ctrl/Cmd+K on every screen): navigation by screen name or document number, live answers (late orders, what to buy, stock of an item, open or late POs, who owes us, bills due, cash, summary, schedule, gauges due, maintenance due, open NCRs, who is clocked in), and actions that run only after confirmation (receive a PO, ship and invoice an order, invoice a shipment, confirm, release, close short, pay a bill, record a payment, quote sent/won/lost, add a line, clock someone in, make an item, create POs for shortages, notes and follow-ups, downtime). "This" refers to the record on screen. Works without any external service; with `ANTHROPIC_API_KEY` set, free-form phrasing is translated into the same commands.
-- Not yet: email in/out, SSO, two-factor sign-in, row-level security in the database (tenancy is enforced in the application), scheduled jobs (recurring entries post when you click, quotes expire when the list is opened).
+- Not yet: email in/out, SSO, two-factor sign-in, row-level security in the database (tenancy is enforced in the application), scheduled jobs (recurring entries post when you click, quotes expire when the list is opened), a recycle bin (deletes are final; the audit log is the record).

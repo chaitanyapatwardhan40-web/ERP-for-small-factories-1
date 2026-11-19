@@ -1,10 +1,10 @@
 import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
-import { attachments, customers, invoices, items, orderChanges, salesOrderLines, salesOrders, shipments, users, workOrders } from "@/lib/db/schema";
+import { attachments, customers, invoices, items, orderChanges, salesOrderLines, salesOrders, shipments, users, workOrderOperations, workOrders } from "@/lib/db/schema";
 import { pickItems, pickLocations } from "@/lib/pick";
 import { Badge, Card, DL, PageHeader, StatusBadge } from "@/components/ui/page";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -12,12 +12,13 @@ import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input, Select, Textarea } from "@/components/ui/fields";
 import { AttachmentsCard } from "@/components/forms/attachments";
 import { AddressFields } from "@/components/forms/address-fields";
-import { addLineAction, cancelLineAction, cancelOrderAction, changeLineAction, confirmOrderFormAction, updateOrderHeaderAction } from "@/modules/sales/actions";
+import { addLineAction, cancelLineAction, cancelOrderAction, changeLineAction, confirmOrderFormAction, deleteOrderAction, updateOrderHeaderAction } from "@/modules/sales/actions";
+import { DeleteCard } from "@/components/forms/delete-card";
 import { lineAmount, openReceivables } from "@/modules/sales/service";
 import { createWorkOrdersForOrderAction } from "@/modules/production/actions";
 import { shipInFullAction } from "@/modules/shipping/actions";
 import { formatAddress } from "@/lib/forms";
-import { fmtDate, fmtDateTime, fmtMoney, fmtQty } from "@/lib/money";
+import { fmtDate, fmtDateTime, fmtMoney, fmtQty, today } from "@/lib/money";
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -50,6 +51,17 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     pickItems(db, ctx.orgId),
     openReceivables(db, ctx.orgId, customer.id),
   ]);
+  const opStats = wos.length
+    ? await db
+        .select({
+          woId: workOrderOperations.workOrderId,
+          total: sql<number>`count(*)`.mapWith(Number),
+          done: sql<number>`count(*) filter (where ${workOrderOperations.status} = 'complete')`.mapWith(Number),
+        })
+        .from(workOrderOperations)
+        .where(inArray(workOrderOperations.workOrderId, wos.map((x) => x.w.id)))
+        .groupBy(workOrderOperations.workOrderId)
+    : [];
   const open = !["draft", "cancelled", "closed", "shipped", "invoiced"].includes(o.status);
   const makeLinesWithoutWo = lines.filter((l) => l.itemType === "make" && !wos.some((w) => w.w.salesOrderLineId === l.l.id) && Number(l.l.qty) - Number(l.l.qtyCancelled) > 0);
   const openQty = (l: typeof salesOrderLines.$inferSelect) => Number(l.qty) - Number(l.qtyShipped) - Number(l.qtyCancelled);
@@ -177,21 +189,35 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <Card title="Work orders" padded={false}>
               <table className="data">
                 <tbody>
-                  {wos.map(({ w, sku }) => (
-                    <tr key={w.id}>
-                      <td>
-                        <Link href={`/work-orders/${w.id}`} className="font-medium text-brand hover:underline">
-                          {w.number}
-                        </Link>
-                        <div className="text-xs text-ink-3">
-                          {sku} × {fmtQty(w.qty)}
-                        </div>
-                      </td>
-                      <td>
-                        <StatusBadge status={w.status} />
-                      </td>
-                    </tr>
-                  ))}
+                  {wos.map(({ w, sku }) => {
+                    const st = opStats.find((x) => x.woId === w.id);
+                    const pct = w.status === "complete" || w.status === "closed" ? 100 : Number(w.qty) > 0 ? Math.min(100, Math.round((Number(w.qtyComplete) / Number(w.qty)) * 100)) : 0;
+                    const opPct = st?.total ? Math.round((st.done / st.total) * 100) : 0;
+                    const late = w.dueDate && w.dueDate < today() && !["complete", "closed", "cancelled"].includes(w.status);
+                    return (
+                      <tr key={w.id}>
+                        <td>
+                          <Link href={`/work-orders/${w.id}`} className="font-medium text-brand hover:underline">
+                            {w.number}
+                          </Link>
+                          <div className="text-xs text-ink-3">
+                            {sku} × {fmtQty(w.qty)}
+                            {w.dueDate ? <span className={late ? " text-bad" : ""}> · due {fmtDate(w.dueDate)}</span> : null}
+                          </div>
+                          <div className="mt-1.5 h-1 w-full max-w-40 rounded bg-paper">
+                            <div className="h-1 rounded bg-brand" style={{ width: `${Math.max(pct, opPct)}%` }} />
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap">
+                          <StatusBadge status={w.status} />
+                          <div className="mt-1 text-xs text-ink-3">
+                            {fmtQty(w.qtyComplete)} of {fmtQty(w.qty)} done
+                            {st?.total ? ` · ${st.done}/${st.total} ops` : ""}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {!wos.length ? (
                     <tr>
                       <td className="text-ink-3">None yet.</td>
@@ -406,6 +432,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </Card>
           ) : null}
           <AttachmentsCard entityType="order" entityId={o.id} rows={docs} returnTo={`/orders/${o.id}`} />
+          {!["partially_shipped", "shipped", "invoiced", "closed"].includes(o.status) && !shs.length && !invs.length && !wos.length ? <DeleteCard action={deleteOrderAction} id={o.id} label={o.number} /> : null}
         </div>
       </div>
     </>

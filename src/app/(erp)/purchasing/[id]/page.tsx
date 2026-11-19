@@ -12,7 +12,8 @@ import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input, Select } from "@/components/ui/fields";
 import { AttachmentsCard } from "@/components/forms/attachments";
 import { CopyBox } from "@/components/ui/copy-box";
-import { billPoAction, poStatusAction, receivePoAction } from "@/modules/purchasing/actions";
+import { billPoAction, deletePoAction, poStatusAction, receivePoAction } from "@/modules/purchasing/actions";
+import { DeleteCard } from "@/components/forms/delete-card";
 import { poEmailText, poTotal } from "@/modules/purchasing/service";
 import { formatAddress } from "@/lib/forms";
 import { fmtDate, fmtDateTime, fmtMoney, fmtQty, today } from "@/lib/money";
@@ -373,6 +374,7 @@ export default async function PoPage({ params }: { params: Promise<{ id: string 
             </form>
           ) : null}
           <AttachmentsCard entityType="po" entityId={po.id} rows={docs} returnTo={`/purchasing/${po.id}`} />
+          {!["partially_received", "received", "closed"].includes(po.status) && !rcpts.length && !bills.length ? <DeleteCard action={deletePoAction} id={po.id} label={po.number} /> : null}
         </div>
       </div>
     </>

@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
-import { customers, items, quoteLines, quotes } from "@/lib/db/schema";
+import { customers, items, leads, quoteLines, quotes } from "@/lib/db/schema";
 import { Card, DL, PageHeader, StatusBadge } from "@/components/ui/page";
 import { Button, LinkButton } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input } from "@/components/ui/fields";
-import { acceptQuoteAction, quoteStatusAction } from "@/modules/sales/actions";
+import { acceptQuoteAction, deleteQuoteAction, quoteStatusAction } from "@/modules/sales/actions";
+import { DeleteCard } from "@/components/forms/delete-card";
 import { fmtDate, fmtMoney, fmtQty } from "@/lib/money";
 
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +31,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     .leftJoin(items, eq(items.id, quoteLines.itemId))
     .where(eq(quoteLines.quoteId, q.id))
     .orderBy(asc(quoteLines.lineNo));
+  const lead = q.leadId ? (await db.select({ id: leads.id, company: leads.company, stage: leads.stage }).from(leads).where(eq(leads.id, q.leadId)))[0] : undefined;
   const cost = lines.reduce((s, { l }) => s + Number(l.qty) * (Number(l.materialCost) + Number(l.laborCost) + Number(l.outsideCost) + Number(l.overheadCost)), 0);
   const margin = Number(q.subtotal) - cost;
   const editable = q.status === "draft" || q.status === "sent";
@@ -132,6 +134,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               rows={[
                 ["Customer", <Link key="c" href={`/customers/${customer.id}`} className="text-brand hover:underline">{customer.name}</Link>],
                 ["RFQ", q.customerRfq],
+                ["Lead", lead ? <Link key="l" href={`/crm/${lead.id}`} className="text-brand hover:underline">{lead.company} · {lead.stage}</Link> : null],
                 ["Estimated cost", fmtMoney(cost)],
                 ["Gross margin", `${fmtMoney(margin)} (${q.subtotal ? ((margin / Number(q.subtotal)) * 100).toFixed(0) : 0}%)`],
                 ["Revision", q.revision],
@@ -163,6 +166,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               </Card>
             </>
           ) : null}
+          {q.status !== "accepted" ? <DeleteCard action={deleteQuoteAction} id={q.id} label={q.number} /> : null}
         </div>
       </div>
     </>

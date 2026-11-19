@@ -12,6 +12,7 @@ import { base, money, pct, qty } from "./_shared";
 import { orgs, users } from "./platform";
 import { customers, type Address } from "./parties";
 import { items } from "./items";
+import { leads } from "./crm";
 
 export const QUOTE_STATUSES = ["draft", "sent", "accepted", "lost", "expired"] as const;
 export const ORDER_STATUSES = [
@@ -45,6 +46,8 @@ export const quotes = pgTable(
     notes: text("notes"),
     lostReason: text("lost_reason"),
     convertedOrderId: uuid("converted_order_id"),
+    /** The lead this quote answers, when it came from one. */
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
     terms: text("terms"),
     discountPct: pct("discount_pct").notNull().default(0),
     contactName: text("contact_name"),

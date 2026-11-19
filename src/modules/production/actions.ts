@@ -16,6 +16,7 @@ import {
   completeWorkOrder,
   createWorkOrder,
   createWorkOrdersForOrder,
+  deleteWorkOrder,
   issueAllMaterials,
   issueMaterial,
   recordLabor,
@@ -166,5 +167,16 @@ export async function updateWorkOrderAction(_prev: ActionState, formData: FormDa
     );
     revalidatePath(`/work-orders/${input.workOrderId}`);
     return { ok: "Work order updated." };
+  });
+}
+
+export async function deleteWorkOrderAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return withFormErrors(async () => {
+    const ctx = await requireOrg();
+    assertCan(ctx, "production.edit");
+    const id = String(formData.get("id") ?? "");
+    const db = await getDb();
+    const wo = await db.transaction((tx) => deleteWorkOrder(tx, ctx, id));
+    redirect(`/work-orders?assistant=${encodeURIComponent(`${wo.number} deleted.`)}`);
   });
 }

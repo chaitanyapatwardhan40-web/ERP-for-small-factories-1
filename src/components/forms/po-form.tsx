@@ -3,7 +3,7 @@ import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, FormGrid, Input, Select, Textarea } from "@/components/ui/fields";
 import { Card } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
-import { LineEditor, type LineRow, type PickItem } from "@/components/forms/line-editor";
+import { LineEditor, type LineRow, type PickItem, type PriceHint } from "@/components/forms/line-editor";
 import { AddressFields } from "@/components/forms/address-fields";
 import { createPoAction, updatePoAction } from "@/modules/purchasing/actions";
 import { today } from "@/lib/money";
@@ -24,7 +24,7 @@ export function PoForm({
   po?: typeof purchaseOrders.$inferSelect;
   lines?: (typeof purchaseOrderLines.$inferSelect)[];
   defaults?: { vendorId?: string; workOrderId?: string; initialLines?: Partial<LineRow>[] };
-  priceHints?: Record<string, { price: number; partNo?: string | null }>;
+  priceHints?: Record<string, PriceHint>;
   shipTo?: Address | null;
 }) {
   const initial: Partial<LineRow>[] | undefined = lines?.length

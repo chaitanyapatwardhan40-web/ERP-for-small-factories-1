@@ -23,7 +23,22 @@ export type LineRow = {
   expectedDate: string;
   vendorPartNo: string;
   notes: string;
+  /** True while the price came from the price list, so it follows the quantity. */
+  autoPrice?: boolean;
 };
+
+export type PriceHint = { price: number; partNo?: string | null; breaks?: { minQty: number; price: number }[] };
+
+/** The list price for a quantity: the highest break at or below it, else the base price. */
+export function hintPrice(hint: PriceHint | undefined, qty: number): number | null {
+  if (!hint) return null;
+  if (hint.breaks?.length) {
+    const hit = [...hint.breaks].filter((b) => b.minQty <= Math.max(qty, 1)).sort((a, b) => b.minQty - a.minQty)[0];
+    if (hit) return hit.price;
+    return null;
+  }
+  return hint.price;
+}
 
 let seq = 1;
 const blank = (marginPct: string): LineRow => ({
@@ -68,24 +83,37 @@ export function LineEditor({
   overheadPct?: number;
   initial?: Partial<LineRow>[];
   /** itemId -> price or cost from a price list, shown as the placeholder. */
-  priceHints?: Record<string, { price: number; partNo?: string | null }>;
+  priceHints?: Record<string, PriceHint>;
 }) {
   const [rows, setRows] = useState<LineRow[]>(
     initial?.length ? initial.map((r) => ({ ...blank(String(defaultMarginPct)), ...r })) : [blank(String(defaultMarginPct))],
   );
   const update = (key: number, patch: Partial<LineRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const listPrice = (itemId: string, qty: string) => {
+    const it = items.find((i) => i.id === itemId);
+    const fromList = hintPrice(priceHints?.[itemId], Number(qty || 1));
+    if (fromList != null) return String(fromList);
+    if (!it) return "";
+    if (mode === "po") return String(it.lastCost || it.standardCost || "");
+    return it.salesPrice ? String(it.salesPrice) : "";
+  };
   const pick = (key: number, itemId: string) => {
     const it = items.find((i) => i.id === itemId);
     if (!it) return update(key, { itemId, description: "" });
-    const hint = priceHints?.[itemId];
+    const row = rows.find((r) => r.key === key);
+    const unitPrice = listPrice(itemId, row?.qty ?? "1");
     const cost = it.standardCost || it.avgCost || it.lastCost || 0;
     if (mode === "quote") {
-      update(key, { itemId, description: it.name, materialCost: String(cost), laborCost: "", outsideCost: "", overheadCost: "", unitPrice: hint ? String(hint.price) : it.salesPrice ? String(it.salesPrice) : "" });
+      update(key, { itemId, description: it.name, materialCost: String(cost), laborCost: "", outsideCost: "", overheadCost: "", unitPrice, autoPrice: true });
     } else if (mode === "order") {
-      update(key, { itemId, description: it.name, unitPrice: hint ? String(hint.price) : String(it.salesPrice || "") });
+      update(key, { itemId, description: it.name, unitPrice, autoPrice: true });
     } else {
-      update(key, { itemId, description: it.name, unitPrice: hint ? String(hint.price) : String(it.lastCost || it.standardCost || ""), vendorPartNo: hint?.partNo ?? "" });
+      update(key, { itemId, description: it.name, unitPrice, vendorPartNo: priceHints?.[itemId]?.partNo ?? "", autoPrice: true });
     }
+  };
+  const setQty = (r: LineRow, qty: string) => {
+    // A price that came from the list follows the quantity breaks; a typed price stays.
+    update(r.key, r.autoPrice && r.itemId ? { qty, unitPrice: listPrice(r.itemId, qty) } : { qty });
   };
   const priceOf = (r: LineRow) => {
     if (r.unitPrice) return Number(r.unitPrice);
@@ -94,7 +122,7 @@ export function LineEditor({
       const m = Math.min(99, Math.max(0, Number(r.marginPct || 0)));
       return cost ? cost / (1 - m / 100) : 0;
     }
-    return priceHints?.[r.itemId]?.price ?? 0;
+    return hintPrice(priceHints?.[r.itemId], Number(r.qty || 1)) ?? 0;
   };
   const extOf = (r: LineRow) => Number(r.qty || 0) * priceOf(r) * (1 - Math.min(100, Math.max(0, Number(r.discountPct || 0))) / 100);
   const total = rows.reduce((s, r) => s + extOf(r), 0);
@@ -149,7 +177,7 @@ export function LineEditor({
                 </td>
               ) : null}
               <td>
-                <input name={`lines[${i}][qty]`} type="number" step="0.0001" min="0" value={r.qty} onChange={(e) => update(r.key, { qty: e.target.value })} className={numCell} required />
+                <input name={`lines[${i}][qty]`} type="number" step="0.0001" min="0" value={r.qty} onChange={(e) => setQty(r, e.target.value)} className={numCell} required />
               </td>
               {mode === "quote" ? (
                 <>
@@ -167,8 +195,8 @@ export function LineEditor({
                   step="0.0001"
                   min="0"
                   value={r.unitPrice}
-                  placeholder={mode === "quote" ? priceOf(r).toFixed(2) : priceHints?.[r.itemId] ? priceHints[r.itemId].price.toFixed(2) : mode === "po" ? "price list" : "price list"}
-                  onChange={(e) => update(r.key, { unitPrice: e.target.value })}
+                  placeholder={mode === "quote" ? priceOf(r).toFixed(2) : (hintPrice(priceHints?.[r.itemId], Number(r.qty || 1)) ?? "price list").toString()}
+                  onChange={(e) => update(r.key, { unitPrice: e.target.value, autoPrice: false })}
                   className={numCell}
                   required={mode === "po" && !r.itemId}
                 />

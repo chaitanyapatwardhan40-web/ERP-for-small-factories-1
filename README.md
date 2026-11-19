@@ -19,6 +19,7 @@ Built for 5–50 person shops. One Next.js app, one Postgres database.
 | Quality | Inspection plans and records, NCRs with dispositions, root cause, containment and cost, CAPAs with preventive actions and effectiveness checks, gauges with calibration history and certificates, vendor rating |
 | People & machines | Employees with loaded rates, departments, shifts, training records and a skills matrix, machines with make, model, location and uptime, preventive maintenance, downtime log |
 | Admin | Documents and drawings with revisions, roles (owner / office / shop / accountant / read-only), audit log, company settings and document text, spreadsheet import, CSV export of every list |
+| Walkthrough | One job from lead to cash on the sample company, step by step, with what to click and what each step posts to the books. |
 | Assistant | Ctrl/Cmd+K on any screen: open records by number, ask about late orders, stock, shortages, receivables or the schedule, and run common actions (receive a PO, ship and invoice, create POs for shortages, make an item, clock someone in) after a one-click confirmation. Works offline; an optional API key adds free-form phrasing. |
 
 ## Run it locally

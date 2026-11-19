@@ -24,14 +24,15 @@ import {
   orgs,
 } from "@/lib/db/schema";
 import type { Ctx } from "@/lib/tenancy";
+import { NUMBER_RE, parseMoney } from "./parse";
 import { can } from "@/lib/tenancy";
 import { addDays, fmtDate, fmtMoney, fmtQty, today } from "@/lib/money";
-import { shortageReport, latePoLines, createPurchaseOrder, receivePurchaseOrder, payBill, setPoStatus, PO_OPEN_STATUSES } from "@/modules/purchasing/service";
+import { shortageReport, latePoLines, createPurchaseOrder, deletePurchaseOrder, receivePurchaseOrder, payBill, setPoStatus, PO_OPEN_STATUSES } from "@/modules/purchasing/service";
 import { todaySummary } from "@/modules/reports/service";
 import { onHand, stockByLocation } from "@/modules/inventory/service";
 import { arAging, apAging, createInvoiceFromShipment, recordCustomerPayment, shipOrderInFull } from "@/modules/shipping/service";
-import { acceptQuote, addOrderLine, confirmOrder, setQuoteStatus } from "@/modules/sales/service";
-import { clockIn, createWorkOrder, releaseWorkOrder, scheduleBoard } from "@/modules/production/service";
+import { acceptQuote, addOrderLine, confirmOrder, deleteOrder, deleteQuote, setQuoteStatus } from "@/modules/sales/service";
+import { clockIn, createWorkOrder, deleteWorkOrder, releaseWorkOrder, scheduleBoard } from "@/modules/production/service";
 import { balanceOfSubtype } from "@/modules/books/service";
 
 /**
@@ -83,9 +84,9 @@ const SCREENS: [RegExp, string, string][] = [
   [/^import$/, "/import", "Import"],
   [/^settings$/, "/settings", "Settings"],
   [/^(today|home|dashboard)$/, "/", "Today"],
+  [/^(walkthrough|tour|guide|how do i start|getting started)$/, "/walkthrough", "Walkthrough"],
 ];
 
-const NUMBER_RE = /\b(SO|PO|WO|INV|Q|SH|BILL|NCR|CAPA|CM|RC)-?(\d{3,6})\b/i;
 
 function pad(n: string) {
   return n.padStart(5, "0");
@@ -187,6 +188,15 @@ export async function interpret(db: DbOrTx, ctx: Ctx, rawText: string, page: Pag
     }
     if (/^(release)\b/.test(lower) && target.kind === "wo") {
       return { type: "confirm", title: `Release ${target.label}`, summary: ["Puts the work order on the floor and the schedule"], action: { command: "release_wo", args: { workOrderId: target.id } } };
+    }
+    if (/^(delete|remove|trash)\b/.test(lower) && ["po", "order", "quote", "wo"].includes(target.kind)) {
+      const what = { po: "purchase order", order: "sales order", quote: "quote", wo: "work order" }[target.kind as "po" | "order" | "quote" | "wo"];
+      return {
+        type: "confirm",
+        title: `Delete ${target.label}`,
+        summary: [`Removes the ${what} for good; the audit log keeps the number`, "Only documents with nothing received, shipped, billed or started can go"],
+        action: { command: "delete_doc", args: { kind: target.kind, id: target.id } },
+      };
     }
     if (/^(close|close short)\b/.test(lower) && target.kind === "po") {
       return { type: "confirm", title: `Close ${target.label} short`, summary: ["Cancels whatever has not been received", "The PO stops counting as on order"], action: { command: "close_po", args: { poId: target.id, reason: text.replace(NUMBER_RE, "").replace(/^(close short|close)\s*/i, "").trim() || "Closed from assistant" } } };
@@ -378,10 +388,6 @@ export async function interpret(db: DbOrTx, ctx: Ctx, rawText: string, page: Pag
   return help(`I didn't understand "${text}".`);
 }
 
-function parseMoney(s: string): number | null {
-  const m = s.match(/\$?\s*(\d[\d,]*(?:\.\d+)?)/);
-  return m ? Number(m[1].replace(/,/g, "")) : null;
-}
 
 async function findItem(db: DbOrTx, orgId: string, needle: string) {
   const n = needle.trim();
@@ -520,6 +526,30 @@ export async function execute(db: DbOrTx, ctx: Ctx, command: string, args: Recor
       need("production.edit");
       await releaseWorkOrder(db, ctx, s("workOrderId"));
       return { message: "Work order released.", href: `/work-orders/${s("workOrderId")}` };
+    case "delete_doc": {
+      const kind = s("kind");
+      if (kind === "po") {
+        need("purchasing.edit");
+        const po = await deletePurchaseOrder(db, ctx, s("id"));
+        return { message: `${po.number} deleted.`, href: "/purchasing" };
+      }
+      if (kind === "order") {
+        need("sales.edit");
+        const o = await deleteOrder(db, ctx, s("id"));
+        return { message: `${o.number} deleted.`, href: "/orders" };
+      }
+      if (kind === "quote") {
+        need("sales.edit");
+        const q = await deleteQuote(db, ctx, s("id"));
+        return { message: `${q.number} deleted.`, href: "/quotes" };
+      }
+      if (kind === "wo") {
+        need("production.edit");
+        const wo = await deleteWorkOrder(db, ctx, s("id"));
+        return { message: `${wo.number} deleted.`, href: "/work-orders" };
+      }
+      throw new Error("Nothing to delete.");
+    }
     case "close_po":
       need("purchasing.edit");
       await setPoStatus(db, ctx, s("poId"), "closed", { reason: s("reason") });
@@ -608,7 +638,7 @@ Known command shapes (examples):
 - go to <screen>  (screens: purchase orders, orders, quotes, customers, vendors, items, inventory, work orders, schedule, shop floor, shipments, invoices, bills, ledger, reports, bank, quality, ncrs, gauges, people, maintenance, settings)
 - <document number> e.g. SO-00057, PO-00012, WO-00050, INV-00087, Q-00003, SH-00087, BILL-00012
 - receive PO-00012 | ship SO-00057 | invoice SH-00087 | confirm SO-00057 | release WO-00050 | close short PO-00012 reason | pay BILL-00012 | payment 500 on INV-00087 | mark Q-00003 sent | Q-00003 won | Q-00003 lost: reason | add 5 SKU to SO-00057
-- receive this | ship this | confirm this | release this (when the user is on that document's page)
+- receive this | ship this | confirm this | release this | delete this (when the user is on that document's page); delete PO-00012 | delete Q-00003 | delete WO-00050 (drafts only)
 - clock in <employee> on WO-00050 op 20 | make 10 SKU due 2026-12-01 | create POs for shortages from <vendor>
 - late orders | what to buy | stock SKU | open POs from <vendor> | late deliveries | who owes us | bills due | cash | summary | schedule for <work center> | gauges due | pm due | open ncrs | who is clocked in
 - note on <customer>: text | follow up with <customer> tomorrow: text | downtime on <machine>: reason | find <name>

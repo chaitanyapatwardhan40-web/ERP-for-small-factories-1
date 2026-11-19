@@ -16,6 +16,8 @@ import {
   confirmOrder,
   createOrder,
   createQuote,
+  deleteOrder,
+  deleteQuote,
   setQuoteStatus,
   updateDraftOrder,
   updateOrderHeader,
@@ -38,7 +40,7 @@ const quoteLine = z.object({
   notes: optStr,
 });
 
-const quoteHead = z.object({ id: optStr, customerId: reqStr, quoteDate: dateStr, validUntil: optDate, customerRfq: optStr, contactName: optStr, terms: optStr, discountPct: optNum, notes: optStr });
+const quoteHead = z.object({ id: optStr, leadId: optStr, customerId: reqStr, quoteDate: dateStr, validUntil: optDate, customerRfq: optStr, contactName: optStr, terms: optStr, discountPct: optNum, notes: optStr });
 
 export async function createQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return withFormErrors(async () => {
@@ -258,5 +260,27 @@ export async function cancelLineAction(_prev: ActionState, formData: FormData): 
     await db.transaction((tx) => cancelOrderLine(tx, ctx, input.lineId, input.reason));
     revalidatePath(`/orders/${input.orderId}`);
     return { ok: "Open quantity cancelled." };
+  });
+}
+
+export async function deleteQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return withFormErrors(async () => {
+    const ctx = await requireOrg();
+    assertCan(ctx, "sales.edit");
+    const id = String(formData.get("id") ?? "");
+    const db = await getDb();
+    const q = await db.transaction((tx) => deleteQuote(tx, ctx, id));
+    redirect(`/quotes?assistant=${encodeURIComponent(`${q.number} deleted.`)}`);
+  });
+}
+
+export async function deleteOrderAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return withFormErrors(async () => {
+    const ctx = await requireOrg();
+    assertCan(ctx, "sales.edit");
+    const id = String(formData.get("id") ?? "");
+    const db = await getDb();
+    const o = await db.transaction((tx) => deleteOrder(tx, ctx, id));
+    redirect(`/orders?assistant=${encodeURIComponent(`${o.number} deleted.`)}`);
   });
 }

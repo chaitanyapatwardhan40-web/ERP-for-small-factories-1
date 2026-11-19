@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { campaigns, customers, leads, LEAD_STAGES } from "@/lib/db/schema";
@@ -67,12 +67,21 @@ export async function convertLeadAction(formData: FormData) {
   if (!lead) redirect("/crm");
   let customerId = lead.customerId;
   if (!customerId) {
-    const code = await nextNumber(db, ctx.orgId, "customer");
-    const [c] = await db.insert(customers).values({ orgId: ctx.orgId, code, name: lead.company, email: lead.email, phone: lead.phone }).returning();
-    customerId = c.id;
-    await db.update(leads).set({ customerId, stage: "won", updatedAt: new Date() }).where(eq(leads.id, id));
+    // The same company may already be a customer; link rather than duplicate.
+    const [existing] = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.orgId, ctx.orgId), sql`lower(${customers.name}) = lower(${lead.company})`))
+      .limit(1);
+    if (existing) customerId = existing.id;
+    else {
+      const code = await nextNumber(db, ctx.orgId, "customer");
+      const [c] = await db.insert(customers).values({ orgId: ctx.orgId, code, name: lead.company, email: lead.email, phone: lead.phone }).returning();
+      customerId = c.id;
+    }
+    await db.update(leads).set({ customerId, updatedAt: new Date() }).where(eq(leads.id, id));
   }
-  redirect(`/quotes/new?customerId=${customerId}`);
+  redirect(`/quotes/new?customerId=${customerId}&leadId=${lead.id}`);
 }
 
 export async function saveCampaignAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

@@ -3,7 +3,7 @@ import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, FormGrid, Input, Select, Textarea } from "@/components/ui/fields";
 import { Card } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
-import { LineEditor, type LineRow, type PickItem } from "@/components/forms/line-editor";
+import { LineEditor, type LineRow, type PickItem, type PriceHint } from "@/components/forms/line-editor";
 import { AddressFields } from "@/components/forms/address-fields";
 import { createOrderAction, updateOrderAction } from "@/modules/sales/actions";
 import { addDays, today } from "@/lib/money";
@@ -25,7 +25,7 @@ export function OrderForm({
   order?: typeof salesOrders.$inferSelect;
   lines?: (typeof salesOrderLines.$inferSelect)[];
   defaults?: { customerId?: string };
-  priceHints?: Record<string, { price: number }>;
+  priceHints?: Record<string, PriceHint>;
   shipTo?: Address | null;
   addresses?: { label: string; address: Address }[];
 }) {

@@ -1,15 +1,19 @@
 import { and, asc, desc, eq, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import {
+  attachments,
   customerPrices,
   customers,
   invoices,
   items,
+  leads,
   orderChanges,
   quoteLines,
   quotes,
   salesOrderLines,
   salesOrders,
+  shipments,
+  workOrders,
   type Address,
   type QUOTE_STATUSES,
 } from "@/lib/db/schema";
@@ -94,20 +98,39 @@ export async function resolveSalesPrice(db: DbOrTx, orgId: string, customerId: s
 }
 
 /** Price hints for a line editor: every item that has a price-list entry for this customer. */
-export async function priceHintsFor(db: DbOrTx, orgId: string, customerId: string | null, date: string) {
+export type PriceHint = { price: number; partNo?: string | null; breaks?: { minQty: number; price: number }[] };
+
+/** Prices per item for the line editor: the base price plus quantity breaks, customer-specific over general. */
+export async function priceHintsFor(db: DbOrTx, orgId: string, customerId: string | null, date: string): Promise<Record<string, PriceHint>> {
   const rows = await db
     .select()
     .from(customerPrices)
     .where(and(eq(customerPrices.orgId, orgId), customerId ? or(eq(customerPrices.customerId, customerId), isNull(customerPrices.customerId))! : isNull(customerPrices.customerId)));
-  const out: Record<string, { price: number }> = {};
+  const byItem: Record<string, { own: Map<number, number>; general: Map<number, number> }> = {};
   for (const r of rows) {
     if (r.validFrom && r.validFrom > date) continue;
     if (r.validTo && r.validTo < date) continue;
-    if (Number(r.minQty) > 1) continue;
-    const existing = out[r.itemId];
-    if (!existing || (r.customerId && customerId)) out[r.itemId] = { price: Number(r.unitPrice) };
+    const slot = (byItem[r.itemId] ??= { own: new Map(), general: new Map() });
+    (r.customerId ? slot.own : slot.general).set(Number(r.minQty), Number(r.unitPrice));
+  }
+  const out: Record<string, PriceHint> = {};
+  for (const [itemId, slot] of Object.entries(byItem)) {
+    // A customer's own list replaces the general one at the same break.
+    const merged = new Map<number, number>([...slot.general, ...slot.own]);
+    const breaks = [...merged.entries()].map(([minQty, price]) => ({ minQty, price })).sort((a, b) => a.minQty - b.minQty);
+    const base = breaks.find((b) => b.minQty <= 1);
+    if (!base && !breaks.length) continue;
+    out[itemId] = { price: (base ?? breaks[0]).price, breaks };
   }
   return out;
+}
+
+/** A quote made from a lead carries the lead with it: quoting, then won or lost. */
+async function moveLead(db: DbOrTx, orgId: string, leadId: string, stage: "quoting" | "won" | "lost", customerId?: string | null, lostReason?: string | null) {
+  await db
+    .update(leads)
+    .set({ stage, ...(customerId ? { customerId } : {}), ...(lostReason ? { lostReason } : {}), updatedAt: new Date() })
+    .where(and(eq(leads.id, leadId), eq(leads.orgId, orgId)));
 }
 
 export async function createQuote(
@@ -122,6 +145,7 @@ export async function createQuote(
     terms?: string | null;
     discountPct?: number | null;
     notes?: string | null;
+    leadId?: string | null;
     lines: QuoteLineInput[];
   },
 ) {
@@ -133,6 +157,7 @@ export async function createQuote(
       orgId: actor.orgId,
       number,
       customerId: input.customerId,
+      leadId: input.leadId ?? null,
       quoteDate: input.quoteDate,
       validUntil: input.validUntil ?? null,
       customerRfq: input.customerRfq ?? null,
@@ -144,6 +169,7 @@ export async function createQuote(
     .returning();
   await replaceQuoteLines(db, actor, quote.id, input.lines);
   await audit(db, { ...actor, action: "quote.create", entityType: "quote", entityId: quote.id });
+  if (input.leadId) await moveLead(db, actor.orgId, input.leadId, "quoting", input.customerId);
   return quote;
 }
 
@@ -215,11 +241,52 @@ export async function setQuoteStatus(
   status: (typeof QUOTE_STATUSES)[number],
   lostReason?: string,
 ) {
-  await db
+  const [q] = await db
     .update(quotes)
     .set({ status, lostReason: lostReason ?? null, updatedAt: new Date() })
-    .where(and(eq(quotes.id, quoteId), eq(quotes.orgId, actor.orgId)));
+    .where(and(eq(quotes.id, quoteId), eq(quotes.orgId, actor.orgId)))
+    .returning({ leadId: quotes.leadId });
+  if (q?.leadId && status === "lost") await moveLead(db, actor.orgId, q.leadId, "lost", null, lostReason);
   await audit(db, { ...actor, action: `quote.${status}`, entityType: "quote", entityId: quoteId });
+}
+
+/** Remove a quote nothing was built on. An accepted quote stays: its order points at it. */
+export async function deleteQuote(db: DbOrTx, actor: Actor, quoteId: string) {
+  const [q] = await db.select().from(quotes).where(and(eq(quotes.id, quoteId), eq(quotes.orgId, actor.orgId)));
+  if (!q) throw new SalesError("Quote not found");
+  if (q.status === "accepted") throw new SalesError(`${q.number} was accepted; the order made from it keeps it on record`);
+  const [oc] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(salesOrders).where(eq(salesOrders.quoteId, quoteId));
+  if (oc?.n) throw new SalesError(`${q.number} has an order made from it and cannot be deleted`);
+  await db.delete(attachments).where(and(eq(attachments.orgId, actor.orgId), eq(attachments.entityType, "quote"), eq(attachments.entityId, quoteId)));
+  await db.delete(quotes).where(eq(quotes.id, quoteId));
+  await audit(db, { ...actor, action: "quote.delete", entityType: "quote", entityId: quoteId, data: { number: q.number, customerId: q.customerId, status: q.status } });
+  return q;
+}
+
+/**
+ * Remove an order nothing has happened on: nothing shipped or invoiced, and
+ * nothing in the shop. Work orders made for it block the delete so nothing on
+ * the floor is left pointing at a missing order.
+ */
+export async function deleteOrder(db: DbOrTx, actor: Actor, orderId: string) {
+  const [o] = await db.select().from(salesOrders).where(and(eq(salesOrders.id, orderId), eq(salesOrders.orgId, actor.orgId)));
+  if (!o) throw new SalesError("Order not found");
+  if (["partially_shipped", "shipped", "invoiced", "closed"].includes(o.status)) {
+    throw new SalesError(`${o.number} is ${o.status.replaceAll("_", " ")}. Cancel it instead of deleting`);
+  }
+  const [sc] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(shipments).where(eq(shipments.orderId, orderId));
+  if (sc?.n) throw new SalesError(`${o.number} has shipments and cannot be deleted`);
+  const [ic] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(invoices).where(eq(invoices.orderId, orderId));
+  if (ic?.n) throw new SalesError(`${o.number} has invoices and cannot be deleted`);
+  const lineIds = (await db.select({ id: salesOrderLines.id }).from(salesOrderLines).where(eq(salesOrderLines.orderId, orderId))).map((l) => l.id);
+  if (lineIds.length) {
+    const wos = await db.select({ number: workOrders.number }).from(workOrders).where(inArray(workOrders.salesOrderLineId, lineIds));
+    if (wos.length) throw new SalesError(`${o.number} has work orders (${wos.map((w) => w.number).join(", ")}). Delete or cancel those first`);
+  }
+  await db.delete(attachments).where(and(eq(attachments.orgId, actor.orgId), eq(attachments.entityType, "order"), eq(attachments.entityId, orderId)));
+  await db.delete(salesOrders).where(eq(salesOrders.id, orderId));
+  await audit(db, { ...actor, action: "order.delete", entityType: "order", entityId: orderId, data: { number: o.number, customerId: o.customerId, status: o.status } });
+  return o;
 }
 
 /** Mark sent quotes past their valid-until date as expired. */
@@ -272,6 +339,7 @@ export async function acceptQuote(db: DbOrTx, actor: Actor, quoteId: string, cus
     .update(quotes)
     .set({ status: "accepted", convertedOrderId: order.id, updatedAt: new Date() })
     .where(eq(quotes.id, quoteId));
+  if (quote.leadId) await moveLead(db, actor.orgId, quote.leadId, "won", quote.customerId);
   await audit(db, { ...actor, action: "quote.accepted", entityType: "quote", entityId: quoteId, data: { orderId: order.id } });
   return order;
 }

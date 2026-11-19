@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
-import { activities, contacts, leads, LEAD_STAGES } from "@/lib/db/schema";
+import { activities, contacts, leads, LEAD_STAGES, quotes } from "@/lib/db/schema";
 import { Card, PageHeader, StatusBadge } from "@/components/ui/page";
+import { fmtDate, fmtMoney } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, FormGrid, Input, Select, Textarea } from "@/components/ui/fields";
@@ -19,9 +20,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const db = await getDb();
   const [l] = await db.select().from(leads).where(and(eq(leads.id, id), eq(leads.orgId, ctx.orgId)));
   if (!l) notFound();
-  const [cts, acts] = await Promise.all([
+  const [cts, acts, qs] = await Promise.all([
     db.select().from(contacts).where(and(eq(contacts.partyType, "lead"), eq(contacts.partyId, l.id))),
     db.select().from(activities).where(and(eq(activities.partyType, "lead"), eq(activities.partyId, l.id))).orderBy(desc(activities.at)),
+    db.select().from(quotes).where(and(eq(quotes.orgId, ctx.orgId), eq(quotes.leadId, l.id))).orderBy(desc(quotes.createdAt)),
   ]);
   return (
     <>
@@ -95,6 +97,28 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </ActionForm>
         </Card>
         <div className="space-y-4">
+          {qs.length ? (
+            <Card title="Quotes" padded={false}>
+              <table className="data">
+                <tbody>
+                  {qs.map((q) => (
+                    <tr key={q.id}>
+                      <td>
+                        <Link href={`/quotes/${q.id}`} className="font-medium text-brand hover:underline">
+                          {q.number}
+                        </Link>
+                        <div className="text-xs text-ink-3">{fmtDate(q.quoteDate)}</div>
+                      </td>
+                      <td className="num">{fmtMoney(q.subtotal)}</td>
+                      <td>
+                        <StatusBadge status={q.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          ) : null}
           <ContactsCard partyType="lead" partyId={l.id} rows={cts} />
           <ActivityCard partyType="lead" partyId={l.id} rows={acts} />
         </div>

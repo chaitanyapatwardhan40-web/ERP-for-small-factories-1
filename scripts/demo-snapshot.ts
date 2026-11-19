@@ -14,8 +14,14 @@ const MAX_AGE_DAYS = 3;
 async function main() {
   const freshOnly = process.argv.includes("--fresh");
   if (freshOnly && fs.existsSync(OUT)) {
-    const ageDays = (Date.now() - fs.statSync(OUT).mtimeMs) / 86_400_000;
-    if (ageDays < MAX_AGE_DAYS) {
+    const built = fs.statSync(OUT).mtimeMs;
+    const ageDays = (Date.now() - built) / 86_400_000;
+    const migrationsDir = path.join(process.cwd(), "drizzle");
+    const newerMigration = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith(".sql"))
+      .some((f) => fs.statSync(path.join(migrationsDir, f)).mtimeMs > built + 1000);
+    if (ageDays < MAX_AGE_DAYS && !newerMigration) {
       console.log(`demo snapshot is ${ageDays.toFixed(1)} days old; keeping it`);
       return;
     }

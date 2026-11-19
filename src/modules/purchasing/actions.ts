@@ -12,6 +12,7 @@ import {
   createBillFromPo,
   createExpenseBill,
   createPurchaseOrder,
+  deletePurchaseOrder,
   deleteVendorItem,
   payBill,
   receivePurchaseOrder,
@@ -255,4 +256,15 @@ export async function deleteVendorItemAction(formData: FormData) {
   const db = await getDb();
   await deleteVendorItem(db, ctx, id);
   revalidatePath(`/vendors/${vendorId}`);
+}
+
+export async function deletePoAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return withFormErrors(async () => {
+    const ctx = await requireOrg();
+    assertCan(ctx, "purchasing.edit");
+    const id = String(formData.get("id") ?? "");
+    const db = await getDb();
+    const po = await db.transaction((tx) => deletePurchaseOrder(tx, ctx, id));
+    redirect(`/purchasing?assistant=${encodeURIComponent(`${po.number} deleted.`)}`);
+  });
 }

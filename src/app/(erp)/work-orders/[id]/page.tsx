@@ -11,8 +11,9 @@ import { Card, DL, PageHeader, StatusBadge } from "@/components/ui/page";
 import { Button, LinkButton } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input, Select, Textarea } from "@/components/ui/fields";
-import { cancelWorkOrderAction, completeWorkOrderAction, issueAllAction, issueMaterialAction, recordLaborAction, releaseWorkOrderAction, updateWorkOrderAction } from "@/modules/production/actions";
+import { cancelWorkOrderAction, completeWorkOrderAction, deleteWorkOrderAction, issueAllAction, issueMaterialAction, recordLaborAction, releaseWorkOrderAction, updateWorkOrderAction } from "@/modules/production/actions";
 import { AttachmentsCard } from "@/components/forms/attachments";
+import { DeleteCard } from "@/components/forms/delete-card";
 import { fmtDate, fmtDateTime, fmtMoney, fmtQty } from "@/lib/money";
 
 export default async function WorkOrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -405,6 +406,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             </Card>
           ) : null}
           <AttachmentsCard entityType="work-order" entityId={wo.id} rows={docs} returnTo={`/work-orders/${wo.id}`} />
+          {["planned", "released", "cancelled"].includes(wo.status) && Number(wo.materialCost) + Number(wo.laborCost) + Number(wo.outsideCost) === 0 && Number(wo.qtyComplete) === 0 ? (
+            <DeleteCard action={deleteWorkOrderAction} id={wo.id} label={wo.number} />
+          ) : null}
         </div>
       </div>
     </>
