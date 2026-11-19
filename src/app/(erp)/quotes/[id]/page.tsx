@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
@@ -52,6 +52,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             <LinkButton href={`/print/quote/${q.id}`} variant="secondary">
               Print / PDF
             </LinkButton>
+            {q.status !== "accepted" ? (
+              <LinkButton href={`/quotes/${q.id}/edit`} variant="secondary">
+                Edit
+              </LinkButton>
+            ) : null}
             {q.status === "draft" ? (
               <form action={quoteStatusAction}>
                 <input type="hidden" name="id" value={q.id} />
@@ -98,7 +103,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                       </td>
                       <td className="num">{Number(l.unitPrice) ? `${(((Number(l.unitPrice) - unitCost) / Number(l.unitPrice)) * 100).toFixed(0)}%` : "—"}</td>
                       <td className="num">{fmtMoney(l.unitPrice)}</td>
-                      <td className="num">{fmtMoney(Number(l.qty) * Number(l.unitPrice))}</td>
+                      <td className="num">{fmtMoney(Number(l.qty) * Number(l.unitPrice) * (1 - Number(l.discountPct) / 100))}{Number(l.discountPct) ? <span className="ml-1 text-xs text-ink-3">−{Number(l.discountPct)}%</span> : null}</td>
                       <td className="num">{l.leadTimeDays} d</td>
                     </tr>
                   );
@@ -130,6 +135,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                 ["Estimated cost", fmtMoney(cost)],
                 ["Gross margin", `${fmtMoney(margin)} (${q.subtotal ? ((margin / Number(q.subtotal)) * 100).toFixed(0) : 0}%)`],
                 ["Revision", q.revision],
+                ["Attention", q.contactName],
+                ["Quote discount", Number(q.discountPct) ? `${Number(q.discountPct)}%` : null],
                 ["Lost reason", q.lostReason],
               ]}
             />

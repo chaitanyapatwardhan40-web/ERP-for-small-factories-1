@@ -35,6 +35,11 @@ export const employees = pgTable("employees", {
   /** Short code typed on the shop-floor tablet. */
   badge: text("badge"),
   skills: jsonb("skills").$type<string[]>().notNull().default([]),
+  department: text("department"),
+  shift: text("shift"),
+  hireDate: date("hire_date"),
+  email: text("email"),
+  phone: text("phone"),
   active: boolean("active").notNull().default(true),
 });
 
@@ -73,6 +78,9 @@ export const workOrders = pgTable(
     outsideCost: money("outside_cost").notNull().default(0),
     overheadCost: money("overhead_cost").notNull().default(0),
     notes: text("notes"),
+    scheduledStart: date("scheduled_start"),
+    scheduledEnd: date("scheduled_end"),
+    scrapReason: text("scrap_reason"),
   },
   (t) => [
     uniqueIndex("work_orders_org_number").on(t.orgId, t.number),
@@ -151,7 +159,28 @@ export const laborEntries = pgTable(
     hourlyRate: money("hourly_rate").notNull().default(0),
     qtyGood: qty("qty_good").notNull().default(0),
     qtyScrap: qty("qty_scrap").notNull().default(0),
+    scrapReason: text("scrap_reason"),
     notes: text("notes"),
   },
   (t) => [index("labor_entries_op").on(t.workOrderOperationId)],
+);
+
+/** Training records behind the skills matrix; expiry drives the renewal list. */
+export const employeeTrainings = pgTable(
+  "employee_trainings",
+  {
+    ...base,
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => orgs.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => employees.id, { onDelete: "cascade" }),
+    skill: text("skill").notNull(),
+    trainedAt: date("trained_at").notNull(),
+    expiresAt: date("expires_at"),
+    trainer: text("trainer"),
+    notes: text("notes"),
+  },
+  (t) => [index("employee_trainings_employee").on(t.employeeId)],
 );

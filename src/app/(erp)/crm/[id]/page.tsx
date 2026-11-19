@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
@@ -83,7 +83,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <Field label="Next action date">
                 <Input name="nextActionAt" type="date" defaultValue={l.nextActionAt ? l.nextActionAt.toISOString().slice(0, 10) : ""} />
               </Field>
+              <Field label="Expected close">
+                <Input name="expectedClose" type="date" defaultValue={l.expectedClose ?? ""} />
+              </Field>
             </FormGrid>
+            {l.stage === "lost" && l.lostReason ? <p className="text-sm text-ink-3">Lost: {l.lostReason}</p> : null}
             <Field label="Notes">
               <Textarea name="notes" defaultValue={l.notes ?? ""} />
             </Field>

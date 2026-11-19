@@ -12,7 +12,7 @@ config({ path: ".env.local" });
 config();
 
 import { and, eq } from "drizzle-orm";
-import { getDb } from "./index";
+import { getDb, type DbOrTx } from "./index";
 import {
   assets,
   bomLines,
@@ -52,8 +52,8 @@ const rnd = () => {
 const pick = <T,>(arr: T[]) => arr[Math.floor(rnd() * arr.length)];
 const between = (a: number, b: number) => a + Math.floor(rnd() * (b - a + 1));
 
-export async function seedDemo() {
-  const db = await getDb();
+export async function seedDemo(target?: DbOrTx) {
+  const db = target ?? (await getDb());
   const [existing] = await db.select().from(users).where(eq(users.email, "owner@kitwise.demo"));
   if (existing) {
     console.log("Already seeded. Run npm run db:reset to start over.");
@@ -354,6 +354,70 @@ export async function seedDemo() {
   const q2 = await createQuote(db, actor, { customerId: custByName["Summit Outdoor Power"], quoteDate: addDays(today(), -40), validUntil: addDays(today(), -10), customerRfq: "SOP-2211", lines: [{ itemId: item["KIT-SPARES-A"], description: "Spares kit A", qty: 25, materialCost: 70, laborCost: 10, overheadCost: 2.5, marginPct: 30 }] });
   const acceptedOrder = await acceptQuote(db, actor, q2.id, "SOP-PO-9018");
   await confirmOrder(db, actor, acceptedOrder.id);
+
+  // Master-data depth: vendor price lists, customer prices and addresses,
+  // training records, calibration history, a recurring entry, budgets.
+  const { vendorItems, customerPrices, customerAddresses, employeeTrainings, gaugeCalibrations, journalTemplates, budgets, customers: customersT, gauges: gaugesT, items: itemsT, vendors: vendorsT } = await import("./schema");
+  const buyItems = await db.select().from(itemsT).where(and(eq(itemsT.orgId, org.id), eq(itemsT.type, "buy")));
+  for (const it of buyItems) {
+    if (!it.preferredVendorId) continue;
+    await db
+      .insert(vendorItems)
+      .values({ orgId: org.id, vendorId: it.preferredVendorId, itemId: it.id, vendorPartNo: `${it.sku.replace(/[^A-Z0-9]/g, "").slice(0, 6)}-${between(100, 999)}`, lastCost: Number(it.lastCost) || Number(it.standardCost), leadTimeDays: it.leadTimeDays || null, minQty: 0, preferred: true, lastPurchasedAt: addDays(today(), -between(5, 60)) })
+      .onConflictDoNothing();
+  }
+  const helix = custByName["Helix Medical Devices"];
+  await db.insert(customerPrices).values([
+    { orgId: org.id, customerId: helix, itemId: item["KIT-SENSOR-SET"], minQty: 0, unitPrice: 230 },
+    { orgId: org.id, customerId: helix, itemId: item["KIT-SENSOR-SET"], minQty: 25, unitPrice: 215 },
+    { orgId: org.id, customerId: null, itemId: item["KIT-SPARES-A"], minQty: 50, unitPrice: 118 },
+  ]);
+  await db.insert(customerAddresses).values([
+    { orgId: org.id, customerId: helix, label: "Plant 2 receiving", address: { line1: "4100 Carnegie Ave", city: "Cleveland", state: "OH", postalCode: "44103", country: "US" }, isDefault: false },
+    { orgId: org.id, customerId: custByName["Harbor Automation"], label: "Integration lab", address: { line1: "77 Innovation Dr", city: "Columbus", state: "OH", postalCode: "43215", country: "US" }, isDefault: false },
+  ]);
+  await db.update(customersT).set({ creditLimit: 75000, salesRep: "Dan Whitfield", industry: "Medical devices", website: "helixmed.example.com" }).where(eq(customersT.id, helix));
+  await db.update(customersT).set({ industry: "Robotics", discountPct: 2 }).where(eq(customersT.id, custByName["Harbor Automation"]));
+  await db.update(vendorsT).set({ is1099: true, taxId: "34-1877201", accountNo: "NLK-2210", paymentMethod: "ach", website: "summitanodizing.example.com" }).where(and(eq(vendorsT.orgId, org.id), eq(vendorsT.id, vend["Summit Anodizing"])));
+  await db.insert(employeeTrainings).values([
+    { orgId: org.id, employeeId: emps[0], skill: "CNC mill", trainedAt: addDays(today(), -400), expiresAt: addDays(today(), 330), trainer: "Haas Factory Outlet" },
+    { orgId: org.id, employeeId: emps[2], skill: "final inspection", trainedAt: addDays(today(), -700), expiresAt: addDays(today(), 30), trainer: "Quality manager" },
+    { orgId: org.id, employeeId: emps[3], skill: "welding", trainedAt: addDays(today(), -800), expiresAt: addDays(today(), -20), trainer: "AWS D1.1 certification", notes: "Renewal booked" },
+    { orgId: org.id, employeeId: emps[4], skill: "packing", trainedAt: addDays(today(), -90), expiresAt: null, trainer: "Grace Kim" },
+  ]);
+  const gaugeRows = await db.select().from(gaugesT).where(eq(gaugesT.orgId, org.id));
+  for (const g of gaugeRows) {
+    if (!g.lastCalibratedAt) continue;
+    await db.insert(gaugeCalibrations).values({ orgId: org.id, gaugeId: g.id, calibratedAt: g.lastCalibratedAt, dueAt: g.nextDueAt, result: "pass", certNo: `CAL-${between(10000, 99999)}`, performedBy: "Lakeshore Calibration" });
+    await db.update(gaugesT).set({ location: pick(["Inspection bench", "CNC1", "Assembly"]), owner: pick(["Grace Kim", "Pat Nguyen"]) }).where(eq(gaugesT.id, g.id));
+  }
+  const [rentExp] = await db.select().from(accounts).where(and(eq(accounts.orgId, org.id), eq(accounts.subtype, "operating_expense")));
+  const [apAcct] = await db.select().from(accounts).where(and(eq(accounts.orgId, org.id), eq(accounts.subtype, "accounts_payable")));
+  if (rentExp && apAcct) {
+    await db.insert(journalTemplates).values({ orgId: org.id, name: "Monthly rent accrual", memo: "Rent, Unit 4", frequency: "monthly", nextDate: `${today().slice(0, 7)}-28`, lines: [{ accountId: rentExp.id, debit: 6800, credit: 0 }, { accountId: apAcct.id, debit: 0, credit: 6800 }] });
+  }
+  const [revenueAcct] = await db.select().from(accounts).where(and(eq(accounts.orgId, org.id), eq(accounts.subtype, "revenue")));
+  const [cogsAcct] = await db.select().from(accounts).where(and(eq(accounts.orgId, org.id), eq(accounts.subtype, "cogs")));
+  // Budgets for the months the sample data covers (the last three), so the variance report reads sensibly.
+  const year = Number(today().slice(0, 4));
+  const thisMonth = Number(today().slice(5, 7));
+  for (let m = Math.max(1, thisMonth - 2); m <= thisMonth; m++) {
+    if (revenueAcct) await db.insert(budgets).values({ orgId: org.id, accountId: revenueAcct.id, year, month: m, amount: 42000 });
+    if (cogsAcct) await db.insert(budgets).values({ orgId: org.id, accountId: cogsAcct.id, year, month: m, amount: 27000 });
+    if (rentExp) await db.insert(budgets).values({ orgId: org.id, accountId: rentExp.id, year, month: m, amount: 8500 });
+  }
+  const { orgs: orgsT } = await import("./schema");
+  await db
+    .update(orgsT)
+    .set({
+      settings: {
+        ...(await db.select({ s: orgsT.settings }).from(orgsT).where(eq(orgsT.id, org.id)).then((r) => r[0]?.s ?? {})),
+        overReceiptPct: 5,
+        company: { legalName: "Northline Kitting & Assembly LLC", address: { line1: "1480 Industrial Pkwy, Unit 4", city: "Toledo", state: "OH", postalCode: "43605", country: "US" }, phone: "(419) 555-0142", email: "office@northlinekitting.example.com", website: "northlinekitting.example.com" },
+        documents: { quoteTerms: "Prices valid 30 days. Lead time from receipt of order and approved drawings. Net 30 with approved credit.", poTerms: "Certificate of conformance required with each shipment. Quote our PO number on all paperwork.", invoiceTerms: "1.5% per month on balances past due." },
+      },
+    })
+    .where(eq(orgsT.id, org.id));
 
   console.log(`Seeded ${n} program orders:`, stats);
   console.log("Sign in: owner@kitwise.demo / kitwise-demo (also office@ and floor@ with the same password)");

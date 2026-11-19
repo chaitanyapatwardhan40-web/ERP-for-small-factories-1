@@ -1,20 +1,27 @@
-import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import Link from "@/components/ui/link";
+import { and, asc, eq, ilike, or } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { vendors } from "@/lib/db/schema";
 import { Card, EmptyState, PageHeader, Badge } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 
 export const metadata = { title: "Vendors" };
 
-export default async function VendorsPage() {
+export default async function VendorsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const sp = await searchParams;
   const ctx = await requireOrg();
   const db = await getDb();
-  const rows = await db.select().from(vendors).where(eq(vendors.orgId, ctx.orgId)).orderBy(asc(vendors.name));
+  const rows = await db
+    .select()
+    .from(vendors)
+    .where(and(eq(vendors.orgId, ctx.orgId), sp.q ? or(ilike(vendors.name, `%${sp.q}%`), ilike(vendors.code, `%${sp.q}%`), ilike(vendors.email, `%${sp.q}%`)) : undefined))
+    .orderBy(asc(vendors.name));
   return (
     <>
       <PageHeader title="Vendors" description={`${rows.length} vendors`} actions={<LinkButton href="/vendors/new">New vendor</LinkButton>} />
+      <ListToolbar action="/vendors" q={sp.q} exportKind="vendors" params={sp} />
       {rows.length ? (
         <Card padded={false}>
           <table className="data">

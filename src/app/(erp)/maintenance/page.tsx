@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input, Select, Textarea } from "@/components/ui/fields";
 import { backUpAction, completeTaskAction, downtimeAction, saveAssetAction, saveTaskAction } from "@/modules/maintenance/actions";
-import { fmtDate, fmtDateTime, today } from "@/lib/money";
+import { addDays, fmtDate, fmtDateTime, today } from "@/lib/money";
 
 export const metadata = { title: "Maintenance" };
 
@@ -21,6 +21,17 @@ export default async function MaintenancePage() {
     db.select().from(workCenters).where(eq(workCenters.orgId, ctx.orgId)),
   ]);
   const t = today();
+  // Uptime over the last 30 days: scheduled hours (work center capacity × working days) less logged downtime.
+  const since = new Date(`${addDays(t, -30)}T00:00:00`);
+  const downtimeHours = (assetId: string) =>
+    downtime
+      .filter((d) => d.d.assetId === assetId && d.d.startedAt >= since)
+      .reduce((s, d) => s + Math.max(0, ((d.d.endedAt ?? new Date()).getTime() - d.d.startedAt.getTime()) / 3_600_000), 0);
+  const uptimePct = (a: typeof assets.$inferSelect) => {
+    const wc = wcs.find((w) => w.id === a.workCenterId);
+    const scheduled = Number(wc?.capacityHoursPerDay ?? 8) * 22;
+    return scheduled > 0 ? Math.max(0, Math.min(100, ((scheduled - downtimeHours(a.id)) / scheduled) * 100)) : null;
+  };
   return (
     <>
       <PageHeader title="Machines and maintenance" />
@@ -33,6 +44,8 @@ export default async function MaintenancePage() {
                   <th>Machine</th>
                   <th>Work center</th>
                   <th>Serial</th>
+                  <th>Location</th>
+                  <th className="num">Uptime 30 d</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -40,9 +53,14 @@ export default async function MaintenancePage() {
               <tbody>
                 {machines.map(({ a, wc }) => (
                   <tr key={a.id}>
-                    <td className="font-medium">{a.name}</td>
+                    <td className="font-medium">
+                      {a.name}
+                      {a.manufacturer || a.model ? <div className="text-xs text-ink-3">{[a.manufacturer, a.model].filter(Boolean).join(" ")}</div> : null}
+                    </td>
                     <td>{wc}</td>
                     <td className="font-mono text-xs">{a.serial}</td>
+                    <td>{a.location}</td>
+                    <td className="num">{uptimePct(a) === null ? "—" : `${uptimePct(a)!.toFixed(0)}%`}</td>
                     <td>
                       <StatusBadge status={a.status} />
                     </td>
@@ -60,7 +78,7 @@ export default async function MaintenancePage() {
                 ))}
                 {!machines.length ? (
                   <tr>
-                    <td colSpan={5} className="text-ink-3">
+                    <td colSpan={7} className="text-ink-3">
                       No machines yet.
                     </td>
                   </tr>
@@ -160,6 +178,11 @@ export default async function MaintenancePage() {
                 ))}
               </Select>
               <Input name="serial" placeholder="Serial" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input name="manufacturer" placeholder="Manufacturer" />
+                <Input name="model" placeholder="Model" />
+              </div>
+              <Input name="location" placeholder="Location (bay, cell)" />
               <Input name="purchasedAt" type="date" />
               <SubmitButton className="w-full">Add</SubmitButton>
             </ActionForm>

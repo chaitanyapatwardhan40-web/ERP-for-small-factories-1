@@ -1,9 +1,13 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { todaySummary } from "@/modules/reports/service";
+import { latePoLines } from "@/modules/purchasing/service";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { activities } from "@/lib/db/schema";
+import { completeActivityAction } from "@/modules/parties/actions";
 import { Card, PageHeader, Stat, StatusBadge, EmptyState } from "@/components/ui/page";
-import { fmtDate, fmtMoney, fmtQty } from "@/lib/money";
+import { addDays, fmtDate, fmtDateTime, fmtMoney, fmtQty } from "@/lib/money";
 
 export const metadata = { title: "Today" };
 
@@ -11,6 +15,18 @@ export default async function TodayPage() {
   const ctx = await requireOrg();
   const db = await getDb();
   const s = await todaySummary(db, ctx.orgId);
+  const [latePos, followUps] = await Promise.all([
+    latePoLines(db, ctx.orgId, s.date),
+    db
+      .select({
+        a: activities,
+        party: sql<string>`coalesce((select name from customers c where c.id = ${activities.partyId}), (select name from vendors v where v.id = ${activities.partyId}), (select company from leads l where l.id = ${activities.partyId}))`,
+      })
+      .from(activities)
+      .where(and(eq(activities.orgId, ctx.orgId), eq(activities.done, false), lte(activities.dueAt, new Date(`${addDays(s.date, 1)}T00:00:00`))))
+      .orderBy(asc(activities.dueAt))
+      .limit(15),
+  ]);
   return (
     <>
       <PageHeader title="Today" description={`${ctx.session.org!.name} · ${fmtDate(s.date)}`} />
@@ -164,6 +180,72 @@ export default async function TodayPage() {
           ) : (
             <div className="p-4">
               <EmptyState title="Nothing late" hint="Every open order is still inside its promise date." />
+            </div>
+          )}
+        </Card>
+        <Card title="Late from vendors" padded={false}>
+          {latePos.length ? (
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>PO</th>
+                  <th>Vendor</th>
+                  <th>Item</th>
+                  <th className="num">Open</th>
+                  <th>Need by</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latePos.slice(0, 10).map(({ po, line, vendorName, sku }) => (
+                  <tr key={line.id}>
+                    <td>
+                      <Link href={`/purchasing/${po.id}`} className="font-medium text-brand hover:underline">
+                        {po.number}
+                      </Link>
+                    </td>
+                    <td>{vendorName}</td>
+                    <td>{sku ?? line.description}</td>
+                    <td className="num">{fmtQty(Number(line.qty) - Number(line.qtyReceived) - Number(line.qtyCancelled))}</td>
+                    <td className="text-bad">{fmtDate(line.expectedDate) || "no date"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-4">
+              <EmptyState title="No late purchase orders" hint="Every open PO line is inside its expected date." />
+            </div>
+          )}
+        </Card>
+        <Card title="Follow-ups due" padded={false}>
+          {followUps.length ? (
+            <table className="data">
+              <tbody>
+                {followUps.map(({ a, party }) => (
+                  <tr key={a.id}>
+                    <td className="text-xs text-ink-3">{fmtDateTime(a.dueAt)}</td>
+                    <td>
+                      <Link href={a.partyType === "customer" ? `/customers/${a.partyId}` : a.partyType === "vendor" ? `/vendors/${a.partyId}` : `/crm/${a.partyId}`} className="font-medium text-brand hover:underline">
+                        {party}
+                      </Link>
+                      <div className="text-xs">{a.summary}</div>
+                    </td>
+                    <td className="text-right">
+                      <form action={completeActivityAction}>
+                        <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="returnTo" value="/" />
+                        <button type="submit" className="text-xs text-brand hover:underline">
+                          Done
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-4">
+              <EmptyState title="No follow-ups due" hint="Log a note with a date on a customer, vendor or lead to see it here." />
             </div>
           )}
         </Card>

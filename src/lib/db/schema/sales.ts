@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { base, money, pct, qty } from "./_shared";
 import { orgs, users } from "./platform";
-import { customers } from "./parties";
+import { customers, type Address } from "./parties";
 import { items } from "./items";
 
 export const QUOTE_STATUSES = ["draft", "sent", "accepted", "lost", "expired"] as const;
@@ -45,6 +45,9 @@ export const quotes = pgTable(
     notes: text("notes"),
     lostReason: text("lost_reason"),
     convertedOrderId: uuid("converted_order_id"),
+    terms: text("terms"),
+    discountPct: pct("discount_pct").notNull().default(0),
+    contactName: text("contact_name"),
   },
   (t) => [uniqueIndex("quotes_org_number").on(t.orgId, t.number)],
 );
@@ -71,6 +74,8 @@ export const quoteLines = pgTable(
     marginPct: pct("margin_pct").notNull().default(30),
     unitPrice: money("unit_price").notNull().default(0),
     leadTimeDays: integer("lead_time_days").notNull().default(14),
+    discountPct: pct("discount_pct").notNull().default(0),
+    notes: text("notes"),
   },
   (t) => [index("quote_lines_quote").on(t.quoteId)],
 );
@@ -94,7 +99,16 @@ export const salesOrders = pgTable(
     promisedDate: date("promised_date"),
     subtotal: money("subtotal").notNull().default(0),
     notes: text("notes"),
+    internalNotes: text("internal_notes"),
     quoteId: uuid("quote_id").references(() => quotes.id, { onDelete: "set null" }),
+    requestedDate: date("requested_date"),
+    shipTo: jsonb("ship_to").$type<Address>(),
+    shipVia: text("ship_via"),
+    freight: money("freight").notNull().default(0),
+    discountPct: pct("discount_pct").notNull().default(0),
+    termsDays: integer("terms_days"),
+    salesRep: text("sales_rep"),
+    holdReason: text("hold_reason"),
   },
   (t) => [
     uniqueIndex("sales_orders_org_number").on(t.orgId, t.number),
@@ -122,6 +136,9 @@ export const salesOrderLines = pgTable(
     promisedDate: date("promised_date"),
     qtyShipped: qty("qty_shipped").notNull().default(0),
     qtyInvoiced: qty("qty_invoiced").notNull().default(0),
+    qtyCancelled: qty("qty_cancelled").notNull().default(0),
+    discountPct: pct("discount_pct").notNull().default(0),
+    notes: text("notes"),
   },
   (t) => [index("so_lines_order").on(t.orderId)],
 );

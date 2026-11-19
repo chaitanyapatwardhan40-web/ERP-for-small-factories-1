@@ -1,9 +1,10 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { listWorkOrders } from "@/modules/production/service";
 import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { fmtDate, fmtMoney, fmtQty, today } from "@/lib/money";
 
 export const metadata = { title: "Work orders" };
@@ -16,12 +17,13 @@ const FILTERS: [string, string, string[]][] = [
   ["all", "All", []],
 ];
 
-export default async function WorkOrdersPage({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
-  const { f } = await searchParams;
+export default async function WorkOrdersPage({ searchParams }: { searchParams: Promise<{ f?: string; q?: string }> }) {
+  const sp = await searchParams;
+  const { f } = sp;
   const ctx = await requireOrg();
   const db = await getDb();
   const filter = FILTERS.find((x) => x[0] === (f ?? "open")) ?? FILTERS[0];
-  const rows = await listWorkOrders(db, ctx.orgId, filter[2]);
+  const rows = await listWorkOrders(db, ctx.orgId, filter[2], sp.q);
   const t = today();
   return (
     <>
@@ -33,6 +35,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
           </Link>
         ))}
       </div>
+      <ListToolbar action="/work-orders" q={sp.q} exportKind="work-orders" params={{ f: sp.f, q: sp.q }} />
       {rows.length ? (
         <Card padded={false}>
           <table className="data">

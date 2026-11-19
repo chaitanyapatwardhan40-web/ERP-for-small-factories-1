@@ -1,9 +1,10 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { listOrders } from "@/modules/sales/service";
 import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { fmtDate, fmtMoney, today } from "@/lib/money";
 
 export const metadata = { title: "Sales orders" };
@@ -18,11 +19,12 @@ const FILTERS = [
   ["draft", "Draft"],
 ];
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const { status } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string; program?: string; customerId?: string }> }) {
+  const sp = await searchParams;
+  const { status } = sp;
   const ctx = await requireOrg();
   const db = await getDb();
-  const rows = await listOrders(db, ctx.orgId, status || undefined);
+  const rows = await listOrders(db, ctx.orgId, { status: status || undefined, q: sp.q, program: sp.program, customerId: sp.customerId });
   const t = today();
   return (
     <>
@@ -34,6 +36,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </Link>
         ))}
       </div>
+      <ListToolbar action="/orders" q={sp.q} exportKind="orders" params={sp} />
       {rows.length ? (
         <Card padded={false}>
           <table className="data">
@@ -56,6 +59,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <Link href={`/orders/${o.id}`} className="font-medium text-brand hover:underline">
                       {o.number}
                     </Link>
+                    {o.holdReason ? <span className="ml-1 text-xs text-warn">hold</span> : null}
                   </td>
                   <td>{o.customerName}</td>
                   <td>{o.customerPo}</td>

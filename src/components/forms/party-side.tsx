@@ -1,7 +1,7 @@
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, Input, Select } from "@/components/ui/fields";
 import { Card } from "@/components/ui/page";
-import { addActivityAction, addContactAction } from "@/modules/parties/actions";
+import { addActivityAction, addContactAction, completeActivityAction } from "@/modules/parties/actions";
 import { fmtDateTime } from "@/lib/money";
 import type { activities, contacts } from "@/lib/db/schema";
 
@@ -52,7 +52,8 @@ export function ActivityCard({ partyType, partyId, rows }: { partyType: "custome
           <option value="meeting">Meeting</option>
           <option value="visit">Visit</option>
         </Select>
-        <Input name="summary" placeholder="What happened?" required />
+        <Input name="summary" placeholder="What happened, or what to do next" required />
+        <Input name="dueAt" type="date" className="w-36" title="Follow-up date (makes this a task)" />
         <SubmitButton size="md" variant="secondary">
           Log
         </SubmitButton>
@@ -60,9 +61,21 @@ export function ActivityCard({ partyType, partyId, rows }: { partyType: "custome
       {rows.length ? (
         <ul className="space-y-2 text-sm">
           {rows.map((a) => (
-            <li key={a.id} className="border-l-2 border-line pl-3">
-              <div className="text-xs text-ink-3">
-                {fmtDateTime(a.at)} · {a.type}
+            <li key={a.id} className={`border-l-2 pl-3 ${a.dueAt && !a.done ? "border-warn" : "border-line"}`}>
+              <div className="flex items-center justify-between gap-2 text-xs text-ink-3">
+                <span>
+                  {fmtDateTime(a.at)} · {a.type}
+                  {a.dueAt ? ` · ${a.done ? "done" : `due ${fmtDateTime(a.dueAt)}`}` : ""}
+                </span>
+                {a.dueAt && !a.done ? (
+                  <form action={completeActivityAction}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <input type="hidden" name="returnTo" value={partyType === "customer" ? `/customers/${partyId}` : partyType === "vendor" ? `/vendors/${partyId}` : `/crm/${partyId}`} />
+                    <button type="submit" className="text-brand hover:underline">
+                      Mark done
+                    </button>
+                  </form>
+                ) : null}
               </div>
               <div>{a.summary}</div>
             </li>

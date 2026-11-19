@@ -16,7 +16,7 @@ export async function saveLeadAction(_prev: ActionState, formData: FormData): Pr
     const ctx = await requireOrg();
     assertCan(ctx, "crm.edit");
     const input = z
-      .object({ id: optStr, company: reqStr, contactName: optStr, email: optStr, phone: optStr, source: optStr, stage: z.enum(LEAD_STAGES).optional(), estimatedValue: optNum, nextAction: optStr, nextActionAt: optStr, notes: optStr })
+      .object({ id: optStr, company: reqStr, contactName: optStr, email: optStr, phone: optStr, source: optStr, stage: z.enum(LEAD_STAGES).optional(), estimatedValue: optNum, nextAction: optStr, nextActionAt: optStr, expectedClose: optStr, notes: optStr })
       .parse(formObject(formData));
     const db = await getDb();
     const values = {
@@ -29,6 +29,7 @@ export async function saveLeadAction(_prev: ActionState, formData: FormData): Pr
       estimatedValue: input.estimatedValue ?? 0,
       nextAction: input.nextAction ?? null,
       nextActionAt: input.nextActionAt ? new Date(input.nextActionAt) : null,
+      expectedClose: input.expectedClose || null,
       notes: input.notes ?? null,
       ownerId: ctx.userId,
       updatedAt: new Date(),
@@ -49,8 +50,9 @@ export async function leadStageAction(formData: FormData) {
   assertCan(ctx, "crm.edit");
   const id = String(formData.get("id") ?? "");
   const stage = String(formData.get("stage") ?? "new") as (typeof LEAD_STAGES)[number];
+  const lostReason = String(formData.get("lostReason") ?? "") || null;
   const db = await getDb();
-  await db.update(leads).set({ stage, updatedAt: new Date() }).where(and(eq(leads.id, id), eq(leads.orgId, ctx.orgId)));
+  await db.update(leads).set({ stage, lostReason: stage === "lost" ? lostReason : null, updatedAt: new Date() }).where(and(eq(leads.id, id), eq(leads.orgId, ctx.orgId)));
   revalidatePath("/crm");
   revalidatePath(`/crm/${id}`);
 }

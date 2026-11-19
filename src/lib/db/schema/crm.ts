@@ -1,4 +1,4 @@
-import { jsonb, pgTable, text, uuid, index } from "drizzle-orm/pg-core";
+import { boolean, date, jsonb, pgTable, text, uuid, index } from "drizzle-orm/pg-core";
 import { base, money, ts } from "./_shared";
 import { orgs, users } from "./platform";
 import { customers } from "./parties";
@@ -26,6 +26,8 @@ export const leads = pgTable(
       onDelete: "set null",
     }),
     ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    expectedClose: date("expected_close"),
+    lostReason: text("lost_reason"),
   },
   (t) => [index("leads_stage").on(t.orgId, t.stage)],
 );
@@ -45,6 +47,8 @@ export const activities = pgTable(
     summary: text("summary").notNull(),
     at: ts("at").notNull().defaultNow(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    dueAt: ts("due_at"),
+    done: boolean("done").notNull().default(false),
   },
   (t) => [index("activities_party").on(t.orgId, t.partyType, t.partyId)],
 );

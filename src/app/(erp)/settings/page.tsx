@@ -5,8 +5,9 @@ import { auditLog, memberships, orgs, users, ROLES } from "@/lib/db/schema";
 import { Card, PageHeader, Badge } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
-import { Field, FormGrid, Input, Select } from "@/components/ui/fields";
-import { addMemberAction, removeMemberAction, updateSettingsAction } from "@/modules/platform/actions";
+import { Field, FormGrid, Input, Select, Textarea } from "@/components/ui/fields";
+import { AddressFields } from "@/components/forms/address-fields";
+import { changePasswordAction, changeRoleAction, inviteMemberAction, removeMemberAction, updateSettingsAction } from "@/modules/platform/actions";
 import { fmtDateTime } from "@/lib/money";
 
 export const metadata = { title: "Settings" };
@@ -46,7 +47,48 @@ export default async function SettingsPage() {
                 <Field label="Default quote margin %">
                   <Input name="defaultMarginPct" type="number" step="0.1" defaultValue={s.defaultMarginPct ?? 30} />
                 </Field>
+                <Field label="Over-receipt allowed %" hint="How far a receipt may exceed the PO quantity">
+                  <Input name="overReceiptPct" type="number" step="0.1" min="0" defaultValue={s.overReceiptPct ?? 0} />
+                </Field>
               </FormGrid>
+              <fieldset className="space-y-3 rounded border border-line p-3">
+                <legend className="px-1 text-xs font-medium text-ink-2">Company (printed on quotes, POs, invoices)</legend>
+                <FormGrid cols={3}>
+                  <Field label="Legal name" className="md:col-span-3">
+                    <Input name="legalName" defaultValue={s.company?.legalName ?? ""} placeholder={org.name} />
+                  </Field>
+                  <Field label="Phone">
+                    <Input name="phone" defaultValue={s.company?.phone ?? ""} />
+                  </Field>
+                  <Field label="Email">
+                    <Input name="email" type="email" defaultValue={s.company?.email ?? ""} />
+                  </Field>
+                  <Field label="Website">
+                    <Input name="website" defaultValue={s.company?.website ?? ""} />
+                  </Field>
+                  <Field label="Tax ID / EIN">
+                    <Input name="taxId" defaultValue={s.company?.taxId ?? ""} />
+                  </Field>
+                </FormGrid>
+                <AddressFields prefix="co" value={s.company?.address} title="Address (default ship-to on purchase orders)" />
+              </fieldset>
+              <fieldset className="space-y-3 rounded border border-line p-3">
+                <legend className="px-1 text-xs font-medium text-ink-2">Standard text on documents</legend>
+                <FormGrid cols={2}>
+                  <Field label="Quote terms">
+                    <Textarea name="quoteTerms" defaultValue={s.documents?.quoteTerms ?? ""} placeholder="Prices valid 30 days. Lead time from receipt of order…" />
+                  </Field>
+                  <Field label="Purchase order terms">
+                    <Textarea name="poTerms" defaultValue={s.documents?.poTerms ?? ""} placeholder="Certs of conformance required with each shipment…" />
+                  </Field>
+                  <Field label="Invoice terms">
+                    <Textarea name="invoiceTerms" defaultValue={s.documents?.invoiceTerms ?? ""} placeholder="1.5% per month on balances past due…" />
+                  </Field>
+                  <Field label="Invoice footer">
+                    <Textarea name="invoiceFooter" defaultValue={s.documents?.invoiceFooter ?? ""} placeholder="Remit to…" />
+                  </Field>
+                </FormGrid>
+              </fieldset>
               <SubmitButton>Save settings</SubmitButton>
             </ActionForm>
           </Card>
@@ -89,7 +131,23 @@ export default async function SettingsPage() {
                     <span className="font-medium">{name}</span> <span className="text-xs text-ink-3">{email}</span>
                   </span>
                   <span className="flex items-center gap-2">
-                    <Badge tone={m.role === "owner" ? "info" : "neutral"}>{m.role}</Badge>
+                    {m.userId !== ctx.userId ? (
+                      <form action={changeRoleAction} className="flex items-center gap-1">
+                        <input type="hidden" name="id" value={m.id} />
+                        <select name="role" defaultValue={m.role} className="rounded border border-line bg-white px-1 py-0.5 text-xs">
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="submit" className="text-xs text-brand hover:underline">
+                          set
+                        </button>
+                      </form>
+                    ) : (
+                      <Badge tone="info">{m.role}</Badge>
+                    )}
                     {m.userId !== ctx.userId ? (
                       <form action={removeMemberAction}>
                         <input type="hidden" name="id" value={m.id} />
@@ -102,20 +160,34 @@ export default async function SettingsPage() {
                 </li>
               ))}
             </ul>
-            <ActionForm action={addMemberAction} className="space-y-2">
-              <Input name="email" type="email" placeholder="Email of a registered user" required />
-              <Select name="role" defaultValue="office">
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </Select>
+            <ActionForm action={inviteMemberAction} className="space-y-2">
+              <Input name="name" placeholder="Name" required />
+              <Input name="email" type="email" placeholder="Email" required />
+              <div className="grid grid-cols-2 gap-2">
+                <Select name="role" defaultValue="office">
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </Select>
+                <Input name="password" type="text" placeholder="Temporary password" required minLength={8} />
+              </div>
               <SubmitButton variant="secondary" className="w-full">
-                Add to shop
+                Add person
               </SubmitButton>
             </ActionForm>
-            <p className="mt-2 text-xs text-ink-3">Owner: all. Office: sell, buy, make. Shop: floor and stock. Accountant: books. Read-only.</p>
+            <p className="mt-2 text-xs text-ink-3">Creates the account if the email is new; they change the password after signing in. Owner: all. Office: sell, buy, make. Shop: floor and stock. Accountant: books. Read-only.</p>
+          </Card>
+          <Card title="Your password">
+            <ActionForm action={changePasswordAction} className="space-y-2">
+              <Input name="current" type="password" placeholder="Current password" autoComplete="current-password" required />
+              <Input name="next" type="password" placeholder="New password (8+ characters)" autoComplete="new-password" required minLength={8} />
+              <Input name="confirm" type="password" placeholder="Repeat new password" autoComplete="new-password" required />
+              <SubmitButton variant="secondary" className="w-full">
+                Change password
+              </SubmitButton>
+            </ActionForm>
           </Card>
         </div>
       </div>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input, Select, Textarea } from "@/components/ui/fields";
 import { addCapaAction, capaStatusAction, dispositionNcrAction, openNcrAction } from "@/modules/quality/actions";
-import { fmtDate, fmtQty } from "@/lib/money";
+import { fmtDate, fmtMoney, fmtQty } from "@/lib/money";
 import { QUALITY_TABS } from "../tabs";
 
 export const metadata = { title: "NCRs and CAPAs" };
@@ -66,6 +66,12 @@ export default async function NcrsPage() {
                             <option value="scrap">scrap</option>
                             <option value="return_to_vendor">return to vendor</option>
                           </Select>
+                          <Input name="rootCause" placeholder="Root cause" defaultValue={n.rootCause ?? ""} />
+                          <Input name="containment" placeholder="Containment (sorted, quarantined…)" defaultValue={n.containment ?? ""} />
+                          <div className="flex gap-1">
+                            <Input name="cost" type="number" step="0.01" placeholder="Cost $" defaultValue={Number(n.cost) ? String(n.cost) : ""} />
+                            <Input name="customerRef" placeholder="Customer ref" defaultValue={n.customerRef ?? ""} />
+                          </div>
                           <label className="flex items-center gap-1 text-xs">
                             <input type="checkbox" name="close" /> close
                           </label>
@@ -74,7 +80,12 @@ export default async function NcrsPage() {
                           </SubmitButton>
                         </ActionForm>
                       ) : (
-                        <span className="text-xs">{n.disposition.replaceAll("_", " ")}</span>
+                        <div className="text-xs">
+                          <div>{n.disposition.replaceAll("_", " ")}</div>
+                          {n.rootCause ? <div className="text-ink-3">Cause: {n.rootCause}</div> : null}
+                          {n.containment ? <div className="text-ink-3">Containment: {n.containment}</div> : null}
+                          {Number(n.cost) ? <div className="text-ink-3">Cost {fmtMoney(n.cost)}</div> : null}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -108,16 +119,29 @@ export default async function NcrsPage() {
                     <td className="font-mono text-xs">{c.number}</td>
                     <td className="font-mono text-xs">{ncrNumber}</td>
                     <td className="text-xs">{c.rootCause}</td>
-                    <td className="text-xs">{c.correctiveAction}</td>
+                    <td className="text-xs">
+                      {c.correctiveAction}
+                      {c.preventiveAction ? <div className="text-ink-3">Prevent: {c.preventiveAction}</div> : null}
+                    </td>
                     <td>{c.owner}</td>
-                    <td>{fmtDate(c.dueDate)}</td>
+                    <td>
+                      {fmtDate(c.dueDate)}
+                      {c.effectivenessCheckAt ? <div className="text-xs text-ink-3">check {fmtDate(c.effectivenessCheckAt)}</div> : null}
+                    </td>
                     <td>
                       <div className="flex items-center gap-1">
                         <StatusBadge status={c.status} />
+                        {c.effective === true ? <span className="text-xs text-good">effective</span> : c.effective === false ? <span className="text-xs text-bad">not effective</span> : null}
                         {c.status !== "closed" ? (
-                          <form action={capaStatusAction}>
+                          <form action={capaStatusAction} className="flex items-center gap-1">
                             <input type="hidden" name="id" value={c.id} />
                             <input type="hidden" name="status" value={c.status === "open" ? "verified" : "closed"} />
+                            {c.status === "verified" ? (
+                              <Select name="effective" defaultValue="yes" className="w-auto text-xs">
+                                <option value="yes">effective</option>
+                                <option value="no">not effective</option>
+                              </Select>
+                            ) : null}
                             <Button type="submit" size="sm" variant="ghost">
                               {c.status === "open" ? "verify" : "close"}
                             </Button>
@@ -179,11 +203,14 @@ export default async function NcrsPage() {
                 ))}
               </Select>
               <Input name="rootCause" placeholder="Root cause" />
-              <Textarea name="correctiveAction" placeholder="Corrective action" required className="min-h-16" />
-              <div className="grid grid-cols-2 gap-2">
+              <Textarea name="correctiveAction" placeholder="Corrective action (fix this occurrence)" required className="min-h-16" />
+              <Textarea name="preventiveAction" placeholder="Preventive action (stop it recurring)" className="min-h-12" />
+              <div className="grid grid-cols-3 gap-2">
                 <Input name="owner" placeholder="Owner" />
-                <Input name="dueDate" type="date" />
+                <Input name="dueDate" type="date" title="Due" />
+                <Input name="effectivenessCheckAt" type="date" title="Effectiveness check" />
               </div>
+              <p className="text-xs text-ink-3">Dates: due, then effectiveness check.</p>
               <SubmitButton variant="secondary" className="w-full">
                 Open CAPA
               </SubmitButton>

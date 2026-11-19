@@ -18,7 +18,7 @@ export async function pickCustomers(db: DbOrTx, orgId: string) {
 }
 
 export async function pickVendors(db: DbOrTx, orgId: string) {
-  return db.select({ id: vendors.id, name: vendors.name, code: vendors.code, leadTimeDays: vendors.leadTimeDays }).from(vendors).where(and(eq(vendors.orgId, orgId), eq(vendors.active, true))).orderBy(asc(vendors.name));
+  return db.select({ id: vendors.id, name: vendors.name, code: vendors.code, leadTimeDays: vendors.leadTimeDays, termsDays: vendors.termsDays, shipVia: vendors.shipVia }).from(vendors).where(and(eq(vendors.orgId, orgId), eq(vendors.active, true))).orderBy(asc(vendors.name));
 }
 
 export async function pickLocations(db: DbOrTx, orgId: string) {

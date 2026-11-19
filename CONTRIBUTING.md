@@ -9,10 +9,11 @@ domain code and the relevant `docs/specs/*.md` before changing a module.
   dynamic). Request-time APIs are async: `params`, `searchParams`, `cookies()`. The request
   filter lives in `src/proxy.ts`.
 - TypeScript, Tailwind v4, hand-written UI primitives in `src/components/ui`.
-- Drizzle ORM. PGlite (embedded Postgres) when `DATABASE_URL` is unset (development, tests, demo
+- Drizzle ORM. PGlite (embedded Postgres) when no database URL is set (development, tests, demo
   mode); postgres-js against any Postgres in production. Migrations in `drizzle/` are generated
-  with `npm run db:generate`, applied automatically by PGlite and with `npm run db:migrate` on
-  Postgres.
+  with `npm run db:generate` and applied on start-up under an advisory lock (`src/lib/db/index.ts`),
+  or by hand with `npm run db:migrate`. `KITWISE_SEED=demo` loads the sample company into an
+  empty database.
 - Vitest for domain tests; each test file gets its own in-memory database.
 
 ## Layout
@@ -26,6 +27,7 @@ src/components/ui     Button, fields, ActionForm/SubmitButton, PageHeader/Card/B
 src/components/forms  shared form pieces (line editor, party forms, attachments, journal form)
 src/lib               db (schema, factory, seed), auth, tenancy, numbering, audit, forms, money
 src/modules/<m>       service.ts (domain logic, takes db/tx + actor), actions.ts ("use server"), tests
+src/modules/assistant command parser (service.ts) and the confirm-then-execute actions behind Ctrl/Cmd+K
 docs/                 glossary, module specs, posting rules
 drizzle/              SQL migrations
 scripts/              demo snapshot builder
@@ -62,7 +64,7 @@ scripts/              demo snapshot builder
 - Forms are uncontrolled: `<ActionForm action={...}>` + `<SubmitButton>`. Repeating lines are
   named `lines[i][field]`.
 - Pages are async server components: `requireOrg()` → queries → JSX. No database calls from
-  client components.
+  client components. Import `Link` from `@/components/ui/link` (no prefetching), not `next/link`.
 - Money and quantity columns are `numeric` with `mode: "number"` (see `schema/_shared.ts`); round
   with `round4`/`round2`; format with `fmtMoney`/`fmtQty`/`fmtDate`.
 - Ids are UUIDs; detail pages call `uuidOr404(id)` before querying.
@@ -90,6 +92,15 @@ Typecheck, lint, tests and build pass; a schema change ships with a migration; a
 event has a posting rule, a service function, a test in `flow.test.ts` or a module test, and an
 audit entry; any new detail page validates its id; the sample company (`src/lib/db/seed.ts`) still
 seeds. Never edit a shipped migration; add a new one.
+
+## Assistant
+
+The assistant (`src/modules/assistant`) maps plain-language requests to a fixed command set with
+regular expressions, answers lookups from the same services the screens use, and returns a
+`confirm` result for anything that writes; `execute` runs the confirmed command inside one
+transaction and checks the role with `can`. Add a command in three places: a pattern in
+`interpret`, a case in `execute`, and a line in the language-model system prompt so the optional
+free-text fallback knows it exists.
 
 ## Not in scope yet
 

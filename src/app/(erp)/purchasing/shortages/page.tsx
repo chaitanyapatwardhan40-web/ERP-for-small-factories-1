@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { shortageReport } from "@/modules/purchasing/service";
@@ -30,6 +30,7 @@ export default async function ShortagesPage() {
                   <th className="num">Demand</th>
                   <th className="num">On order</th>
                   <th className="num">Reorder pt</th>
+                  <th className="num">Safety</th>
                   <th className="num">Suggested</th>
                   <th className="num">Last cost</th>
                   <th>Vendor</th>
@@ -52,6 +53,7 @@ export default async function ShortagesPage() {
                     <td className="num">{fmtQty(r.demand)}</td>
                     <td className="num">{fmtQty(r.onOrder)}</td>
                     <td className="num">{fmtQty(r.reorderPoint)}</td>
+                    <td className="num">{fmtQty(r.safetyStock)}</td>
                     <td className="num font-semibold">{fmtQty(r.suggestedQty)}</td>
                     <td className="num">{fmtMoney(r.lastCost)}</td>
                     <td>{vendorName(r.preferredVendorId) ?? <span className="text-warn">no preferred vendor</span>}</td>

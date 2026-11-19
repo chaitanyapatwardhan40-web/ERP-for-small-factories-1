@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import {
   employees,
@@ -218,14 +218,16 @@ export async function clockIn(db: DbOrTx, actor: Actor, input: { operationId: st
 export async function clockOut(
   db: DbOrTx,
   actor: Actor,
-  input: { laborEntryId: string; qtyGood?: number; qtyScrap?: number; notes?: string | null; endedAt?: Date; operationComplete?: boolean },
+  input: { laborEntryId: string; qtyGood?: number; qtyScrap?: number; scrapReason?: string | null; notes?: string | null; endedAt?: Date; operationComplete?: boolean },
 ) {
   const [entry] = await db.select().from(laborEntries).where(and(eq(laborEntries.id, input.laborEntryId), eq(laborEntries.orgId, actor.orgId)));
   if (!entry) throw new ProductionError("Labour entry not found");
   if (entry.endedAt) throw new ProductionError("Already clocked out");
   const endedAt = input.endedAt ?? new Date();
   const hours = round4(Math.max(0, (endedAt.getTime() - entry.startedAt.getTime()) / 3_600_000));
-  return finishLabor(db, actor, entry, { hours, endedAt, qtyGood: input.qtyGood ?? 0, qtyScrap: input.qtyScrap ?? 0, notes: input.notes, operationComplete: input.operationComplete });
+  const result = await finishLabor(db, actor, entry, { hours, endedAt, qtyGood: input.qtyGood ?? 0, qtyScrap: input.qtyScrap ?? 0, notes: input.notes, operationComplete: input.operationComplete });
+  if (input.scrapReason && (input.qtyScrap ?? 0) > 0) await db.update(laborEntries).set({ scrapReason: input.scrapReason }).where(eq(laborEntries.id, entry.id));
+  return result;
 }
 
 /** Manual time entry (paper timesheet, supervisor correction). */
@@ -294,7 +296,7 @@ async function finishLabor(
 export async function completeWorkOrder(
   db: DbOrTx,
   actor: Actor,
-  input: { workOrderId: string; qtyGood: number; qtyScrap?: number; locationId: string; lotNumber?: string | null; overheadPct?: number },
+  input: { workOrderId: string; qtyGood: number; qtyScrap?: number; scrapReason?: string | null; locationId: string; lotNumber?: string | null; overheadPct?: number },
 ) {
   const wo = await getWo(db, actor.orgId, input.workOrderId);
   if (!["released", "in_progress"].includes(wo.status)) throw new ProductionError(`${wo.number} is ${wo.status}`);
@@ -340,6 +342,7 @@ export async function completeWorkOrder(
       qtyComplete: round4(Number(wo.qtyComplete) + good),
       qtyScrap: round4(Number(wo.qtyScrap) + scrap),
       overheadCost: round4(Number(wo.overheadCost) + Math.max(0, overhead)),
+      scrapReason: scrap > 0 ? (input.scrapReason ?? wo.scrapReason) : wo.scrapReason,
       completedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -387,9 +390,10 @@ export async function scheduleBoard(db: DbOrTx, orgId: string) {
   });
 }
 
-export async function listWorkOrders(db: DbOrTx, orgId: string, statuses?: string[]) {
+export async function listWorkOrders(db: DbOrTx, orgId: string, statuses?: string[], q?: string) {
   const conds = [eq(workOrders.orgId, orgId)];
   if (statuses?.length) conds.push(inArray(workOrders.status, statuses as (typeof workOrders.status.enumValues)[number][]));
+  if (q) conds.push(or(ilike(workOrders.number, `%${q}%`), ilike(items.sku, `%${q}%`), ilike(items.name, `%${q}%`))!);
   return db
     .select({
       id: workOrders.id,
@@ -411,4 +415,52 @@ export async function listWorkOrders(db: DbOrTx, orgId: string, statuses?: strin
     .innerJoin(items, eq(items.id, workOrders.itemId))
     .where(and(...conds))
     .orderBy(asc(workOrders.priority), asc(workOrders.dueDate), desc(workOrders.number));
+}
+
+/** Planning fields on a work order: priority, dates, notes, and quantity while still planned. */
+export async function updateWorkOrder(
+  db: DbOrTx,
+  actor: Actor,
+  workOrderId: string,
+  patch: { priority?: number | null; dueDate?: string | null; scheduledStart?: string | null; scheduledEnd?: string | null; notes?: string | null; qty?: number | null },
+) {
+  const wo = await getWo(db, actor.orgId, workOrderId);
+  if (["complete", "closed", "cancelled"].includes(wo.status)) throw new ProductionError(`${wo.number} is ${wo.status}`);
+  if (patch.qty != null && Number(patch.qty) !== Number(wo.qty)) {
+    if (wo.status !== "planned") throw new ProductionError("Quantity can only change while the work order is planned");
+    const ratio = Number(patch.qty) / Number(wo.qty);
+    const mats = await db.select().from(workOrderMaterials).where(eq(workOrderMaterials.workOrderId, wo.id));
+    for (const m of mats) await db.update(workOrderMaterials).set({ qtyRequired: round4(Number(m.qtyRequired) * ratio) }).where(eq(workOrderMaterials.id, m.id));
+    const ops = await db.select().from(workOrderOperations).where(eq(workOrderOperations.workOrderId, wo.id));
+    for (const o of ops) await db.update(workOrderOperations).set({ plannedRunHours: round4(Number(o.plannedRunHours) * ratio) }).where(eq(workOrderOperations.id, o.id));
+  }
+  await db
+    .update(workOrders)
+    .set({
+      priority: patch.priority ?? wo.priority,
+      dueDate: patch.dueDate === undefined ? wo.dueDate : patch.dueDate,
+      scheduledStart: patch.scheduledStart === undefined ? wo.scheduledStart : patch.scheduledStart,
+      scheduledEnd: patch.scheduledEnd === undefined ? wo.scheduledEnd : patch.scheduledEnd,
+      notes: patch.notes === undefined ? wo.notes : patch.notes,
+      qty: patch.qty != null ? Number(patch.qty) : wo.qty,
+      updatedAt: new Date(),
+    })
+    .where(eq(workOrders.id, wo.id));
+  await audit(db, { ...actor, action: "wo.update", entityType: "wo", entityId: wo.id, data: patch });
+}
+
+/** Material availability for a work order: what is still needed and whether stock covers it. */
+export async function materialAvailability(db: DbOrTx, orgId: string, workOrderId: string) {
+  const mats = await db
+    .select({ m: workOrderMaterials, sku: items.sku, name: items.name, type: items.type })
+    .from(workOrderMaterials)
+    .innerJoin(items, eq(items.id, workOrderMaterials.itemId))
+    .where(and(eq(workOrderMaterials.orgId, orgId), eq(workOrderMaterials.workOrderId, workOrderId)));
+  const out = [];
+  for (const r of mats) {
+    const stock = await onHand(db, orgId, r.m.itemId);
+    const remaining = round4(Number(r.m.qtyRequired) - Number(r.m.qtyIssued));
+    out.push({ ...r, onHand: stock, remaining, short: round4(Math.max(0, remaining - stock)) });
+  }
+  return out;
 }

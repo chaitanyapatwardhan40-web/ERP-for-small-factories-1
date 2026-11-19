@@ -8,7 +8,8 @@ import { memberships, orgs, users } from "@/lib/db/schema";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession, getSession, switchSessionOrg } from "@/lib/auth/session";
 import { requireOrg, assertCan } from "@/lib/tenancy";
-import { formObject, withFormErrors, reqStr, optNum } from "@/lib/forms";
+import { audit } from "@/lib/audit";
+import { formObject, optNum, optStr, pickAddress, reqStr, withFormErrors } from "@/lib/forms";
 import type { ActionState } from "@/components/ui/form";
 import { addMember, createOrg, orgsForUser, registerUser } from "./service";
 import { revalidatePath } from "next/cache";
@@ -71,6 +72,7 @@ export async function updateSettingsAction(_prev: ActionState, formData: FormDat
   return withFormErrors(async () => {
     const ctx = await requireOrg();
     assertCan(ctx, "settings.edit");
+    const raw = formObject(formData);
     const input = z
       .object({
         name: reqStr,
@@ -79,10 +81,21 @@ export async function updateSettingsAction(_prev: ActionState, formData: FormDat
         defaultTaxRatePct: optNum,
         overheadPct: optNum,
         defaultMarginPct: optNum,
+        overReceiptPct: optNum,
+        legalName: optStr,
+        phone: optStr,
+        email: optStr,
+        website: optStr,
+        taxId: optStr,
+        quoteTerms: optStr,
+        poTerms: optStr,
+        invoiceTerms: optStr,
+        invoiceFooter: optStr,
       })
-      .parse(formObject(formData));
+      .parse(raw);
     const db = await getDb();
     const [org] = await db.select().from(orgs).where(eq(orgs.id, ctx.orgId));
+    const address = pickAddress(raw, "co") ?? org.settings.company?.address;
     await db
       .update(orgs)
       .set({
@@ -94,6 +107,21 @@ export async function updateSettingsAction(_prev: ActionState, formData: FormDat
           defaultTaxRatePct: input.defaultTaxRatePct ?? org.settings.defaultTaxRatePct,
           overheadPct: input.overheadPct ?? org.settings.overheadPct,
           defaultMarginPct: input.defaultMarginPct ?? org.settings.defaultMarginPct,
+          overReceiptPct: input.overReceiptPct ?? org.settings.overReceiptPct ?? 0,
+          company: {
+            legalName: input.legalName || undefined,
+            address: address ?? undefined,
+            phone: input.phone || undefined,
+            email: input.email || undefined,
+            website: input.website || undefined,
+            taxId: input.taxId || undefined,
+          },
+          documents: {
+            quoteTerms: input.quoteTerms || undefined,
+            poTerms: input.poTerms || undefined,
+            invoiceTerms: input.invoiceTerms || undefined,
+            invoiceFooter: input.invoiceFooter || undefined,
+          },
         },
         updatedAt: new Date(),
       })
@@ -127,4 +155,48 @@ export async function removeMemberAction(formData: FormData) {
     await db.delete(memberships).where(eq(memberships.id, id));
   }
   revalidatePath("/settings");
+}
+
+export async function changeRoleAction(formData: FormData) {
+  const ctx = await requireOrg();
+  assertCan(ctx, "settings.edit");
+  const id = String(formData.get("id") ?? "");
+  const role = String(formData.get("role") ?? "") as "owner" | "office" | "shop" | "accountant" | "readonly";
+  const db = await getDb();
+  const [m] = await db.select().from(memberships).where(eq(memberships.id, id));
+  if (m && m.orgId === ctx.orgId && m.userId !== ctx.userId && ["owner", "office", "shop", "accountant", "readonly"].includes(role)) {
+    await db.update(memberships).set({ role }).where(eq(memberships.id, id));
+    await audit(db, { orgId: ctx.orgId, userId: ctx.userId, action: "member.role", entityType: "membership", entityId: id, data: { role } });
+  }
+  revalidatePath("/settings");
+}
+
+export async function changePasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return withFormErrors(async () => {
+    const ctx = await requireOrg();
+    const input = z.object({ current: z.string().min(1, "Enter your current password"), next: z.string().min(8, "At least 8 characters"), confirm: z.string() }).parse(formObject(formData));
+    if (input.next !== input.confirm) return { error: "New passwords do not match" };
+    const db = await getDb();
+    const { hashPassword } = await import("@/lib/auth/password");
+    const [u] = await db.select().from(users).where(eq(users.id, ctx.userId));
+    if (!u || !(await verifyPassword(input.current, u.passwordHash))) return { error: "Current password is wrong" };
+    await db.update(users).set({ passwordHash: await hashPassword(input.next), updatedAt: new Date() }).where(eq(users.id, u.id));
+    await audit(db, { orgId: ctx.orgId, userId: ctx.userId, action: "user.password", entityType: "user", entityId: u.id });
+    return { ok: "Password changed." };
+  });
+}
+
+export async function inviteMemberAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return withFormErrors(async () => {
+    const ctx = await requireOrg();
+    assertCan(ctx, "settings.edit");
+    const input = z.object({ email: z.string().email(), name: reqStr, role: z.enum(["owner", "office", "shop", "accountant", "readonly"]), password: z.string().min(8, "At least 8 characters") }).parse(formObject(formData));
+    const db = await getDb();
+    const [existing] = await db.select().from(users).where(eq(users.email, input.email.trim().toLowerCase()));
+    if (!existing) await registerUser(db, { email: input.email, name: input.name, password: input.password });
+    await addMember(db, ctx.orgId, input.email, input.role);
+    await audit(db, { orgId: ctx.orgId, userId: ctx.userId, action: "member.invite", entityType: "membership", entityId: ctx.orgId, data: { email: input.email, role: input.role } });
+    revalidatePath("/settings");
+    return { ok: existing ? `${input.email} added as ${input.role}.` : `Account created for ${input.email}; share the temporary password with them.` };
+  });
 }

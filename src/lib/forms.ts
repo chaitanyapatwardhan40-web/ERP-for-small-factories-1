@@ -75,3 +75,21 @@ export function errorMessage(e: unknown): string {
 function isRedirectError(e: unknown): boolean {
   return typeof e === "object" && e !== null && "digest" in e && String((e as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
 }
+
+/** Address fields named <prefix>Line1, <prefix>City... -> Address or null. */
+export function pickAddress(o: Record<string, unknown>, p: string) {
+  const a = {
+    line1: o[`${p}Line1`] as string | undefined,
+    line2: o[`${p}Line2`] as string | undefined,
+    city: o[`${p}City`] as string | undefined,
+    state: o[`${p}State`] as string | undefined,
+    postalCode: o[`${p}PostalCode`] as string | undefined,
+    country: o[`${p}Country`] as string | undefined,
+  };
+  return Object.values(a).some(Boolean) ? a : null;
+}
+
+export function formatAddress(a: { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string } | null | undefined): string[] {
+  if (!a) return [];
+  return [a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(" "), a.country && a.country !== "US" ? a.country : undefined].filter(Boolean) as string[];
+}

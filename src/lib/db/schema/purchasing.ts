@@ -1,6 +1,7 @@
 import {
   date,
   integer,
+  jsonb,
   pgTable,
   text,
   uniqueIndex,
@@ -9,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { base, money, qty, ts } from "./_shared";
 import { orgs, users } from "./platform";
-import { vendors } from "./parties";
+import { vendors, type Address } from "./parties";
 import { items, locations } from "./items";
 
 export const PO_STATUSES = [
@@ -42,6 +43,17 @@ export const purchaseOrders = pgTable(
     notes: text("notes"),
     /** Set for outside-processing POs raised from a work order operation. */
     workOrderId: uuid("work_order_id"),
+    termsDays: integer("terms_days"),
+    shipVia: text("ship_via"),
+    freight: money("freight").notNull().default(0),
+    tax: money("tax").notNull().default(0),
+    shipTo: jsonb("ship_to").$type<Address>(),
+    internalNotes: text("internal_notes"),
+    buyerId: uuid("buyer_id").references(() => users.id, { onDelete: "set null" }),
+    sentAt: ts("sent_at"),
+    closedAt: ts("closed_at"),
+    cancelReason: text("cancel_reason"),
+    revision: integer("revision").notNull().default(1),
   },
   (t) => [
     uniqueIndex("purchase_orders_org_number").on(t.orgId, t.number),
@@ -60,15 +72,19 @@ export const purchaseOrderLines = pgTable(
       .notNull()
       .references(() => purchaseOrders.id, { onDelete: "cascade" }),
     lineNo: integer("line_no").notNull().default(1),
-    itemId: uuid("item_id")
-      .notNull()
-      .references(() => items.id),
+    /** Null for service / non-stock lines (freight, tooling, outside work). */
+    itemId: uuid("item_id").references(() => items.id),
+    lineType: text("line_type", { enum: ["item", "service"] }).notNull().default("item"),
     description: text("description").notNull(),
+    vendorPartNo: text("vendor_part_no"),
     qty: qty("qty").notNull().default(1),
     unitCost: money("unit_cost").notNull().default(0),
     qtyReceived: qty("qty_received").notNull().default(0),
     qtyBilled: qty("qty_billed").notNull().default(0),
+    qtyCancelled: qty("qty_cancelled").notNull().default(0),
     expectedDate: date("expected_date"),
+    expenseSubtype: text("expense_subtype"),
+    notes: text("notes"),
   },
   (t) => [index("po_lines_po").on(t.poId)],
 );

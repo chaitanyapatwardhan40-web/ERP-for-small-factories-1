@@ -1,25 +1,51 @@
-import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import Link from "@/components/ui/link";
+import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { customers, invoices } from "@/lib/db/schema";
 import { arAging } from "@/modules/shipping/service";
 import { Card, EmptyState, PageHeader, Stat, StatusBadge } from "@/components/ui/page";
+import { LinkButton } from "@/components/ui/button";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { fmtDate, fmtMoney, today } from "@/lib/money";
 
 export const metadata = { title: "Invoices" };
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string; paid?: string }> }) {
+  const sp = await searchParams;
   const ctx = await requireOrg();
   const db = await getDb();
   const [rows, aging] = await Promise.all([
-    db.select({ i: invoices, customerName: customers.name }).from(invoices).innerJoin(customers, eq(customers.id, invoices.customerId)).where(eq(invoices.orgId, ctx.orgId)).orderBy(desc(invoices.issueDate), desc(invoices.number)),
+    db
+      .select({ i: invoices, customerName: customers.name })
+      .from(invoices)
+      .innerJoin(customers, eq(customers.id, invoices.customerId))
+      .where(
+        and(
+          eq(invoices.orgId, ctx.orgId),
+          sp.status ? eq(invoices.status, sp.status as "issued" | "paid" | "void" | "draft") : undefined,
+          sp.q ? or(ilike(invoices.number, `%${sp.q}%`), ilike(customers.name, `%${sp.q}%`)) : undefined,
+        ),
+      )
+      .orderBy(desc(invoices.issueDate), desc(invoices.number)),
     arAging(db, ctx.orgId),
   ]);
   const t = today();
   return (
     <>
-      <PageHeader title="Invoices" />
+      <PageHeader
+        title="Invoices"
+        description={sp.paid ? `Payment ${sp.paid} recorded.` : undefined}
+        actions={
+          <>
+            <LinkButton href="/books/reports#aging" variant="secondary">
+              Aging report
+            </LinkButton>
+            <LinkButton href="/invoices/receive">Receive payment</LinkButton>
+          </>
+        }
+      />
+      <ListToolbar action="/invoices" q={sp.q} exportKind="invoices" params={sp} filters={[{ name: "status", value: sp.status, options: [{ value: "", label: "All statuses" }, { value: "issued", label: "open" }, { value: "paid", label: "paid" }, { value: "void", label: "void" }] }]} />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat label="Open" value={fmtMoney(aging.buckets.total)} />
         <Stat label="Current" value={fmtMoney(aging.buckets.current)} tone="good" />

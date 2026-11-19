@@ -69,6 +69,24 @@ export function ItemForm({ item, vendorList, units }: { item?: typeof items.$inf
         <Field label="Drawing number">
           <Input name="drawingNumber" defaultValue={item?.drawingNumber ?? ""} />
         </Field>
+        <Field label="Category">
+          <Input name="category" defaultValue={item?.category ?? ""} placeholder="Hardware, raw stock, kits…" />
+        </Field>
+        <Field label="Barcode / UPC">
+          <Input name="barcode" defaultValue={item?.barcode ?? ""} />
+        </Field>
+        <Field label="Weight (lb)">
+          <Input name="weight" type="number" step="0.0001" min="0" defaultValue={item?.weight ?? 0} />
+        </Field>
+        <Field label="Safety stock" hint="Floor below which the shortage list suggests buying">
+          <Input name="safetyStock" type="number" step="0.0001" min="0" defaultValue={item?.safetyStock ?? 0} />
+        </Field>
+        <Field label="Minimum order qty">
+          <Input name="minOrderQty" type="number" step="0.0001" min="0" defaultValue={item?.minOrderQty ?? 0} />
+        </Field>
+        <Field label="Shelf life (days)" hint="Blank = none">
+          <Input name="shelfLifeDays" type="number" min="0" defaultValue={item?.shelfLifeDays ?? ""} />
+        </Field>
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input type="checkbox" name="trackLots" defaultChecked={item?.trackLots ?? false} /> Track lots
         </label>

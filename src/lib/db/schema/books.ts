@@ -1,4 +1,5 @@
 import {
+  jsonb,
   boolean,
   date,
   integer,
@@ -170,6 +171,11 @@ export const invoices = pgTable(
     total: money("total").notNull().default(0),
     amountPaid: money("amount_paid").notNull().default(0),
     notes: text("notes"),
+    kind: text("kind", { enum: ["invoice", "credit_memo"] }).notNull().default("invoice"),
+    creditOfInvoiceId: uuid("credit_of_invoice_id"),
+    freight: money("freight").notNull().default(0),
+    termsDays: integer("terms_days"),
+    memo: text("memo"),
   },
   (t) => [uniqueIndex("invoices_org_number").on(t.orgId, t.number)],
 );
@@ -214,6 +220,8 @@ export const customerPayments = pgTable(
       .notNull()
       .default("check"),
     reference: text("reference"),
+    unapplied: money("unapplied").notNull().default(0),
+    memo: text("memo"),
   },
   (t) => [uniqueIndex("customer_payments_org_number").on(t.orgId, t.number)],
 );
@@ -244,6 +252,7 @@ export const vendorBills = pgTable(
     dueDate: date("due_date").notNull(),
     subtotal: money("subtotal").notNull().default(0),
     tax: money("tax").notNull().default(0),
+    freight: money("freight").notNull().default(0),
     total: money("total").notNull().default(0),
     amountPaid: money("amount_paid").notNull().default(0),
     /** Expense bills (rent, utilities) post here instead of accrued purchases. */
@@ -304,11 +313,67 @@ export const bankTransactions = pgTable("bank_transactions", {
   orgId: uuid("org_id")
     .notNull()
     .references(() => orgs.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
   postedAt: date("posted_at").notNull(),
   description: text("description").notNull(),
+  reference: text("reference"),
   amount: money("amount").notNull(),
   matchedType: text("matched_type"),
   matchedId: uuid("matched_id"),
   reconciled: boolean("reconciled").notNull().default(false),
   importedAt: ts("imported_at").defaultNow(),
 });
+
+/** One customer payment can settle several invoices. */
+export const customerPaymentApplications = pgTable(
+  "customer_payment_applications",
+  {
+    ...base,
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => orgs.id, { onDelete: "cascade" }),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => customerPayments.id, { onDelete: "cascade" }),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id),
+    amount: money("amount").notNull(),
+  },
+  (t) => [index("cpa_payment").on(t.paymentId), index("cpa_invoice").on(t.invoiceId)],
+);
+
+export type TemplateLine = { accountId: string; debit: number; credit: number; memo?: string };
+
+/** Recurring or reusable journal entries (depreciation, accruals, rent). */
+export const journalTemplates = pgTable("journal_templates", {
+  ...base,
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => orgs.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  memo: text("memo"),
+  lines: jsonb("lines").$type<TemplateLine[]>().notNull().default([]),
+  frequency: text("frequency", { enum: ["none", "weekly", "monthly", "quarterly", "yearly"] }).notNull().default("monthly"),
+  nextDate: date("next_date"),
+  lastPostedAt: date("last_posted_at"),
+  active: boolean("active").notNull().default(true),
+});
+
+/** Budget per account and month; compared with actuals in reports. */
+export const budgets = pgTable(
+  "budgets",
+  {
+    ...base,
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => orgs.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    month: integer("month").notNull(),
+    amount: money("amount").notNull().default(0),
+  },
+  (t) => [uniqueIndex("budgets_account_period").on(t.orgId, t.accountId, t.year, t.month)],
+);

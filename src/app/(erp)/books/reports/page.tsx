@@ -1,10 +1,11 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { balanceSheet, profitAndLoss } from "@/modules/books/service";
 import { apAging, arAging } from "@/modules/shipping/service";
 import { customerMargins, jobMargins, onTimeDelivery } from "@/modules/reports/service";
 import { inventoryLedgerValue } from "@/modules/inventory/service";
+import { cashFlow, closeChecklist, salesTaxReport, vendor1099Report } from "@/modules/books/extras";
 import { Card, PageHeader, Tabs, Stat } from "@/components/ui/page";
 import { fmtDate, fmtMoney, fmtQty, today } from "@/lib/money";
 import { BOOKS_TABS } from "../tabs";
@@ -18,7 +19,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const t = today();
   const from = sp.from ?? `${t.slice(0, 4)}-01-01`;
   const to = sp.to ?? t;
-  const [pnl, bs, ar, ap, jobs, custs, otd, inv] = await Promise.all([
+  const year = Number(to.slice(0, 4));
+  const [pnl, bs, ar, ap, jobs, custs, otd, inv, cf, tax, v1099, close] = await Promise.all([
     profitAndLoss(db, ctx.orgId, from, to),
     balanceSheet(db, ctx.orgId, to),
     arAging(db, ctx.orgId, to),
@@ -27,6 +29,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     customerMargins(db, ctx.orgId),
     onTimeDelivery(db, ctx.orgId, 90),
     inventoryLedgerValue(db, ctx.orgId),
+    cashFlow(db, ctx.orgId, from, to),
+    salesTaxReport(db, ctx.orgId, from, to),
+    vendor1099Report(db, ctx.orgId, year),
+    closeChecklist(db, ctx.orgId, to),
   ]);
   const Row = ({ r }: { r: { id: string; code: string; name: string; balance: number } }) => (
     <tr>
@@ -48,6 +54,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <span className="text-ink-3">to</span>
         <input type="date" name="to" defaultValue={to} className="rounded border border-line bg-white px-2 py-1" />
         <button className="rounded border border-line bg-white px-3 py-1">Run</button>
+        <a href={`/api/export?kind=journal&from=${from}&to=${to}`} className="ml-auto text-brand hover:underline">
+          Export journal (CSV)
+        </a>
       </form>
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Net income" value={fmtMoney(pnl.netIncome)} tone={pnl.netIncome >= 0 ? "good" : "bad"} hint={`${fmtDate(from)} – ${fmtDate(to)}`} />
@@ -259,6 +268,150 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 <tr>
                   <td colSpan={5} className="text-ink-3">
                     No completed customer jobs yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </Card>
+        <Card title={`Cash flow · ${fmtDate(from)} – ${fmtDate(to)}`} padded={false}>
+          <table className="data">
+            <tbody>
+              <tr>
+                <td>Net income</td>
+                <td className="num">{fmtMoney(cf.netIncome)}</td>
+              </tr>
+              <tr>
+                <td className="pl-6 text-ink-2">Change in receivables</td>
+                <td className="num">{fmtMoney(-cf.arChange)}</td>
+              </tr>
+              <tr>
+                <td className="pl-6 text-ink-2">Change in inventory and WIP</td>
+                <td className="num">{fmtMoney(-cf.inventoryChange)}</td>
+              </tr>
+              <tr>
+                <td className="pl-6 text-ink-2">Change in payables and accruals</td>
+                <td className="num">{fmtMoney(cf.apChange)}</td>
+              </tr>
+              <tr className="font-medium">
+                <td>Cash from operations</td>
+                <td className="num">{fmtMoney(cf.operating)}</td>
+              </tr>
+              <tr>
+                <td>Cash from investing (fixed assets)</td>
+                <td className="num">{fmtMoney(cf.investing)}</td>
+              </tr>
+              <tr>
+                <td>Cash from financing (owner)</td>
+                <td className="num">{fmtMoney(cf.financing)}</td>
+              </tr>
+              <tr className="font-semibold">
+                <td>Change in cash</td>
+                <td className="num">{fmtMoney(cf.cashChange)}</td>
+              </tr>
+              {Math.abs(cf.unexplained) > 0.005 ? (
+                <tr>
+                  <td className="text-xs text-ink-3">Not explained by the lines above (other balance-sheet accounts)</td>
+                  <td className="num text-xs text-ink-3">{fmtMoney(cf.unexplained)}</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </Card>
+        <Card title="Close checklist" padded={false}>
+          <table className="data">
+            <tbody>
+              <tr>
+                <td>Bank lines not reconciled</td>
+                <td className={`num ${close.bankUnreconciled ? "text-warn" : "text-good"}`}>{close.bankUnreconciled}</td>
+              </tr>
+              <tr>
+                <td>Receipts not yet billed by the vendor</td>
+                <td className={`num ${close.receivedNotBilled.count ? "text-warn" : "text-good"}`}>
+                  {close.receivedNotBilled.count} · {fmtMoney(close.receivedNotBilled.amount)}
+                </td>
+              </tr>
+              <tr>
+                <td>Overdue receivables</td>
+                <td className={`num ${close.overdueAr.count ? "text-warn" : "text-good"}`}>
+                  {close.overdueAr.count} · {fmtMoney(close.overdueAr.amount)}
+                </td>
+              </tr>
+              <tr>
+                <td>Overdue payables</td>
+                <td className={`num ${close.overdueAp.count ? "text-warn" : "text-good"}`}>
+                  {close.overdueAp.count} · {fmtMoney(close.overdueAp.amount)}
+                </td>
+              </tr>
+              <tr>
+                <td>Work orders open in WIP</td>
+                <td className="num">
+                  {close.openWip.count} · {fmtMoney(close.openWip.amount)}
+                </td>
+              </tr>
+              <tr>
+                <td>Recurring entries due</td>
+                <td className={`num ${close.templatesDue ? "text-warn" : "text-good"}`}>{close.templatesDue}</td>
+              </tr>
+            </tbody>
+          </table>
+        </Card>
+        <Card title={`Sales tax · ${fmtDate(from)} – ${fmtDate(to)}`} padded={false}>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th className="num">Taxable sales</th>
+                <th className="num">Exempt sales</th>
+                <th className="num">Tax collected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tax.map((r) => (
+                <tr key={r.month}>
+                  <td>{r.month}</td>
+                  <td className="num">{fmtMoney(r.taxable)}</td>
+                  <td className="num">{fmtMoney(r.exempt)}</td>
+                  <td className="num">{fmtMoney(r.tax)}</td>
+                </tr>
+              ))}
+              {!tax.length ? (
+                <tr>
+                  <td colSpan={4} className="text-ink-3">
+                    No invoices in the period.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </Card>
+        <Card title={`1099 vendors · ${year}`} padded={false}>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Vendor</th>
+                <th>Tax ID</th>
+                <th className="num">Paid</th>
+                <th>Reportable</th>
+              </tr>
+            </thead>
+            <tbody>
+              {v1099.map((r) => (
+                <tr key={r.vendorId}>
+                  <td>
+                    <Link href={`/vendors/${r.vendorId}`} className="text-brand hover:underline">
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="text-ink-3">{r.taxId ?? "missing"}</td>
+                  <td className="num">{fmtMoney(r.paid)}</td>
+                  <td>{r.reportable ? "Yes (≥ $600)" : "No"}</td>
+                </tr>
+              ))}
+              {!v1099.length ? (
+                <tr>
+                  <td colSpan={4} className="text-ink-3">
+                    No payments to 1099 vendors this year. Mark vendors as 1099 on their page.
                   </td>
                 </tr>
               ) : null}

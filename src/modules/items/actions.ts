@@ -28,6 +28,12 @@ const itemSchema = z.object({
   trackLots: bool.optional(),
   revision: optStr,
   drawingNumber: optStr,
+  category: optStr,
+  barcode: optStr,
+  weight: optNum,
+  safetyStock: optNum,
+  minOrderQty: optNum,
+  shelfLifeDays: optNum,
   status: z.enum(["active", "obsolete"]).optional(),
 });
 
@@ -52,6 +58,12 @@ export async function saveItemAction(_prev: ActionState, formData: FormData): Pr
       trackLots: input.trackLots ?? false,
       revision: input.revision || "A",
       drawingNumber: input.drawingNumber ?? null,
+      category: input.category ?? null,
+      barcode: input.barcode ?? null,
+      weight: input.weight ?? 0,
+      safetyStock: input.safetyStock ?? 0,
+      minOrderQty: input.minOrderQty ?? 0,
+      shelfLifeDays: input.shelfLifeDays ?? null,
       status: input.status ?? "active",
       updatedAt: new Date(),
     };
@@ -88,7 +100,7 @@ export async function addBomLineAction(_prev: ActionState, formData: FormData): 
     const ctx = await requireOrg();
     assertCan(ctx, "master.edit");
     const input = z
-      .object({ itemId: reqStr, componentSku: reqStr, qty: z.coerce.number().positive(), scrapPct: optNum, notes: optStr })
+      .object({ itemId: reqStr, componentSku: reqStr, qty: z.coerce.number().positive(), scrapPct: optNum, refDes: optStr, notes: optStr })
       .parse(formObject(formData));
     const db = await getDb();
     const [comp] = await db.select().from(items).where(and(eq(items.orgId, ctx.orgId), eq(items.sku, input.componentSku.trim())));
@@ -103,6 +115,7 @@ export async function addBomLineAction(_prev: ActionState, formData: FormData): 
       qty: input.qty,
       scrapPct: input.scrapPct ?? 0,
       position: (existing.length + 1) * 10,
+      refDes: input.refDes ?? null,
       notes: input.notes ?? null,
     });
     await recost(ctx.orgId, input.itemId);

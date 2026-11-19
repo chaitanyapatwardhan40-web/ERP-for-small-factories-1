@@ -1,4 +1,5 @@
 import {
+  boolean,
   date,
   integer,
   jsonb,
@@ -8,7 +9,7 @@ import {
   uuid,
   index,
 } from "drizzle-orm/pg-core";
-import { base, qty, ts } from "./_shared";
+import { base, money, qty, ts } from "./_shared";
 import { orgs, users } from "./platform";
 import { items } from "./items";
 import { vendors } from "./parties";
@@ -92,6 +93,10 @@ export const ncrs = pgTable(
     status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
     openedBy: uuid("opened_by").references(() => users.id, { onDelete: "set null" }),
     closedAt: ts("closed_at"),
+    rootCause: text("root_cause"),
+    containment: text("containment"),
+    cost: money("cost").notNull().default(0),
+    customerRef: text("customer_ref"),
   },
   (t) => [uniqueIndex("ncrs_org_number").on(t.orgId, t.number)],
 );
@@ -109,6 +114,9 @@ export const capas = pgTable(
     correctiveAction: text("corrective_action").notNull(),
     owner: text("owner"),
     dueDate: date("due_date"),
+    preventiveAction: text("preventive_action"),
+    effectivenessCheckAt: date("effectiveness_check_at"),
+    effective: boolean("effective"),
     status: text("status", { enum: ["open", "verified", "closed"] })
       .notNull()
       .default("open"),
@@ -126,7 +134,30 @@ export const gauges = pgTable("gauges", {
   calibrationIntervalDays: integer("calibration_interval_days").notNull().default(365),
   lastCalibratedAt: date("last_calibrated_at"),
   nextDueAt: date("next_due_at"),
+  location: text("location"),
+  owner: text("owner"),
   status: text("status", { enum: ["in_service", "due", "out_of_service"] })
     .notNull()
     .default("in_service"),
 });
+
+/** Calibration history per gauge; the gauge row keeps only the latest dates. */
+export const gaugeCalibrations = pgTable(
+  "gauge_calibrations",
+  {
+    ...base,
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => orgs.id, { onDelete: "cascade" }),
+    gaugeId: uuid("gauge_id")
+      .notNull()
+      .references(() => gauges.id, { onDelete: "cascade" }),
+    calibratedAt: date("calibrated_at").notNull(),
+    dueAt: date("due_at"),
+    result: text("result", { enum: ["pass", "fail", "adjusted"] }).notNull().default("pass"),
+    certNo: text("cert_no"),
+    performedBy: text("performed_by"),
+    notes: text("notes"),
+  },
+  (t) => [index("gauge_calibrations_gauge").on(t.gaugeId)],
+);

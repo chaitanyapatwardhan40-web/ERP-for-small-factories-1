@@ -16,7 +16,7 @@ export default async function PrintPackListPage({ params }: { params: Promise<{ 
   if (!row) notFound();
   const [org] = await db.select().from(orgs).where(eq(orgs.id, ctx.orgId));
   const lines = await db.select({ l: shipmentLines, sku: items.sku, description: salesOrderLines.description, ordered: salesOrderLines.qty }).from(shipmentLines).innerJoin(items, eq(items.id, shipmentLines.itemId)).innerJoin(salesOrderLines, eq(salesOrderLines.id, shipmentLines.orderLineId)).where(eq(shipmentLines.shipmentId, row.s.id));
-  const a = row.customer.shippingAddress ?? row.customer.billingAddress;
+  const a = row.s.shipTo ?? row.customer.shippingAddress ?? row.customer.billingAddress;
   return (
     <PrintDoc
       title="Packing list"
@@ -28,8 +28,10 @@ export default async function PrintPackListPage({ params }: { params: Promise<{ 
         ["Your PO", row.order.customerPo ?? "—"],
         ["Carrier", row.s.carrier ?? "—"],
         ["Tracking", row.s.tracking ?? "—"],
+        ["Packages", String(row.s.packages)],
+        ["Weight", Number(row.s.weight) ? `${Number(row.s.weight)} lb` : "—"],
       ]}
-      party={{ label: "Ship to", name: row.customer.name, lines: [a?.line1, [a?.city, a?.state, a?.postalCode].filter(Boolean).join(" ")].filter(Boolean) as string[] }}
+      party={{ label: "Ship to", name: row.customer.name, lines: [a?.line1, a?.line2, [a?.city, a?.state, a?.postalCode].filter(Boolean).join(" ")].filter(Boolean) as string[] }}
       notes={row.s.notes}
     >
       <table className="data">

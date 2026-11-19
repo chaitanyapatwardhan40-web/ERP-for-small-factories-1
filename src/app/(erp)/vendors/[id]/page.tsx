@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
@@ -8,6 +8,10 @@ import { activities, contacts, items, ncrs, purchaseOrders, vendorBills, vendors
 import { Card, DL, PageHeader, StatusBadge } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
 import { ActivityCard, ContactsCard } from "@/components/forms/party-side";
+import { VendorPriceListCard } from "@/components/forms/price-list";
+import { vendorPriceList, poTotal, PO_OPEN_STATUSES } from "@/modules/purchasing/service";
+import { pickItems } from "@/lib/pick";
+import { formatAddress } from "@/lib/forms";
 import { fmtDate, fmtMoney } from "@/lib/money";
 
 export default async function VendorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,14 +21,17 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
   const db = await getDb();
   const [v] = await db.select().from(vendors).where(and(eq(vendors.id, id), eq(vendors.orgId, ctx.orgId)));
   if (!v) notFound();
-  const [pos, bills, supplied, openNcrs, cts, acts] = await Promise.all([
+  const [pos, bills, supplied, openNcrs, cts, acts, prices, itemList] = await Promise.all([
     db.select().from(purchaseOrders).where(eq(purchaseOrders.vendorId, v.id)).orderBy(desc(purchaseOrders.orderDate)).limit(20),
     db.select().from(vendorBills).where(eq(vendorBills.vendorId, v.id)).orderBy(desc(vendorBills.billDate)).limit(20),
     db.select().from(items).where(and(eq(items.orgId, ctx.orgId), eq(items.preferredVendorId, v.id))),
     db.select().from(ncrs).where(and(eq(ncrs.vendorId, v.id), eq(ncrs.status, "open"))),
     db.select().from(contacts).where(and(eq(contacts.partyType, "vendor"), eq(contacts.partyId, v.id))),
     db.select().from(activities).where(and(eq(activities.partyType, "vendor"), eq(activities.partyId, v.id))).orderBy(desc(activities.at)).limit(20),
+    vendorPriceList(db, ctx.orgId, v.id),
+    pickItems(db, ctx.orgId),
   ]);
+  const onOrder = pos.filter((p) => (PO_OPEN_STATUSES as readonly string[]).includes(p.status)).reduce((s, p) => s + poTotal(p), 0);
   const confirmed = pos.filter((p) => p.confirmedDate && p.expectedDate);
   const onTime = confirmed.filter((p) => p.confirmedDate! <= p.expectedDate!).length;
   const openAp = bills.filter((b) => b.status === "approved").reduce((s, b) => s + Number(b.total) - Number(b.amountPaid), 0);
@@ -53,15 +60,28 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
               rows={[
                 ["Email", v.email],
                 ["Phone", v.phone],
-                ["Address", v.address ? [v.address.line1, v.address.city, v.address.state].filter(Boolean).join(", ") : "—"],
+                ["Website", v.website],
+                ["Address", formatAddress(v.address).join(", ") || "—"],
+                ["Our account #", v.accountNo],
+                ["Pays by", v.paymentMethod],
+                ["Ship via", v.shipVia],
+                ["Minimum order", Number(v.minOrder) ? fmtMoney(v.minOrder) : null],
+                ["1099", v.is1099 ? `Yes${v.taxId ? ` · ${v.taxId}` : ""}` : "No"],
+                ["On order", fmtMoney(onOrder)],
                 ["Open payables", fmtMoney(openAp)],
                 ["Confirmed on time", confirmed.length ? `${onTime}/${confirmed.length} POs` : "no confirmations yet"],
                 ["Open NCRs", openNcrs.length],
-                ["Supplies", supplied.map((i) => i.sku).join(", ") || "—"],
+                ["Preferred for", supplied.map((i) => i.sku).join(", ") || "—"],
+                ["Rating", v.rating != null ? `${Number(v.rating).toFixed(0)} / 100` : null],
                 ["Notes", v.notes],
               ]}
             />
           </Card>
+          <VendorPriceListCard
+            vendorId={v.id}
+            items={itemList}
+            rows={prices.map((p) => ({ id: p.vi.id, itemId: p.vi.itemId, sku: p.sku, name: p.name, vendorPartNo: p.vi.vendorPartNo, lastCost: Number(p.vi.lastCost), leadTimeDays: p.vi.leadTimeDays, minQty: Number(p.vi.minQty), preferred: p.vi.preferred, lastPurchasedAt: p.vi.lastPurchasedAt }))}
+          />
           <Card title="Purchase orders" padded={false}>
             <table className="data">
               <thead>
@@ -86,7 +106,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
                     <td>
                       <StatusBadge status={p.status} />
                     </td>
-                    <td className="num">{fmtMoney(p.subtotal)}</td>
+                    <td className="num">{fmtMoney(poTotal(p))}</td>
                   </tr>
                 ))}
                 {!pos.length ? (

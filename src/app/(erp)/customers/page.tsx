@@ -1,20 +1,27 @@
-import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import Link from "@/components/ui/link";
+import { and, asc, eq, ilike, or } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { customers } from "@/lib/db/schema";
 import { Card, EmptyState, PageHeader, Badge } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 
 export const metadata = { title: "Customers" };
 
-export default async function CustomersPage() {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const sp = await searchParams;
   const ctx = await requireOrg();
   const db = await getDb();
-  const rows = await db.select().from(customers).where(eq(customers.orgId, ctx.orgId)).orderBy(asc(customers.name));
+  const rows = await db
+    .select()
+    .from(customers)
+    .where(and(eq(customers.orgId, ctx.orgId), sp.q ? or(ilike(customers.name, `%${sp.q}%`), ilike(customers.code, `%${sp.q}%`), ilike(customers.email, `%${sp.q}%`)) : undefined))
+    .orderBy(asc(customers.name));
   return (
     <>
       <PageHeader title="Customers" description={`${rows.length} customers`} actions={<LinkButton href="/customers/new">New customer</LinkButton>} />
+      <ListToolbar action="/customers" q={sp.q} exportKind="customers" params={sp} />
       {rows.length ? (
         <Card padded={false}>
           <table className="data">

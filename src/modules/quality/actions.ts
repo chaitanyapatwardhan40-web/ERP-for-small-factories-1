@@ -93,11 +93,11 @@ export async function dispositionNcrAction(_prev: ActionState, formData: FormDat
   return withFormErrors(async () => {
     const ctx = await requireOrg();
     assertCan(ctx, "quality.edit");
-    const input = z.object({ id: reqStr, disposition: z.enum(["pending", "use_as_is", "rework", "scrap", "return_to_vendor"]), close: optStr }).parse(formObject(formData));
+    const input = z.object({ id: reqStr, disposition: z.enum(["pending", "use_as_is", "rework", "scrap", "return_to_vendor"]), rootCause: optStr, containment: optStr, cost: optNum, customerRef: optStr, close: optStr }).parse(formObject(formData));
     const db = await getDb();
     await db
       .update(ncrs)
-      .set({ disposition: input.disposition, status: input.close ? "closed" : "open", closedAt: input.close ? new Date() : null, updatedAt: new Date() })
+      .set({ disposition: input.disposition, rootCause: input.rootCause ?? null, containment: input.containment ?? null, cost: input.cost ?? 0, customerRef: input.customerRef ?? null, status: input.close ? "closed" : "open", closedAt: input.close ? new Date() : null, updatedAt: new Date() })
       .where(and(eq(ncrs.id, input.id), eq(ncrs.orgId, ctx.orgId)));
     // Vendor rating: 100 minus 5 per open NCR this year (simple, explainable).
     const [ncr] = await db.select().from(ncrs).where(eq(ncrs.id, input.id));
@@ -114,10 +114,10 @@ export async function addCapaAction(_prev: ActionState, formData: FormData): Pro
   return withFormErrors(async () => {
     const ctx = await requireOrg();
     assertCan(ctx, "quality.edit");
-    const input = z.object({ ncrId: optStr, rootCause: optStr, correctiveAction: reqStr, owner: optStr, dueDate: optDate }).parse(formObject(formData));
+    const input = z.object({ ncrId: optStr, rootCause: optStr, correctiveAction: reqStr, preventiveAction: optStr, owner: optStr, dueDate: optDate, effectivenessCheckAt: optDate }).parse(formObject(formData));
     const db = await getDb();
     const number = await nextNumber(db, ctx.orgId, "capa");
-    await db.insert(capas).values({ orgId: ctx.orgId, number, ncrId: input.ncrId || null, rootCause: input.rootCause ?? null, correctiveAction: input.correctiveAction, owner: input.owner ?? null, dueDate: input.dueDate ?? null });
+    await db.insert(capas).values({ orgId: ctx.orgId, number, ncrId: input.ncrId || null, rootCause: input.rootCause ?? null, correctiveAction: input.correctiveAction, preventiveAction: input.preventiveAction ?? null, owner: input.owner ?? null, dueDate: input.dueDate ?? null, effectivenessCheckAt: input.effectivenessCheckAt ?? null });
     revalidatePath("/quality/ncrs");
     return { ok: `${number} opened.` };
   });
@@ -128,8 +128,12 @@ export async function capaStatusAction(formData: FormData) {
   assertCan(ctx, "quality.edit");
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "open") as "open" | "verified" | "closed";
+  const effectiveRaw = String(formData.get("effective") ?? "");
   const db = await getDb();
-  await db.update(capas).set({ status, updatedAt: new Date() }).where(and(eq(capas.id, id), eq(capas.orgId, ctx.orgId)));
+  await db
+    .update(capas)
+    .set({ status, effective: effectiveRaw === "" ? undefined : effectiveRaw === "yes", updatedAt: new Date() })
+    .where(and(eq(capas.id, id), eq(capas.orgId, ctx.orgId)));
   revalidatePath("/quality/ncrs");
 }
 
@@ -137,11 +141,11 @@ export async function saveGaugeAction(_prev: ActionState, formData: FormData): P
   return withFormErrors(async () => {
     const ctx = await requireOrg();
     assertCan(ctx, "quality.edit");
-    const input = z.object({ id: optStr, name: reqStr, serial: optStr, calibrationIntervalDays: optNum, lastCalibratedAt: optDate }).parse(formObject(formData));
+    const input = z.object({ id: optStr, name: reqStr, serial: optStr, location: optStr, owner: optStr, calibrationIntervalDays: optNum, lastCalibratedAt: optDate }).parse(formObject(formData));
     const db = await getDb();
     const interval = input.calibrationIntervalDays ?? 365;
     const next = input.lastCalibratedAt ? addDays(input.lastCalibratedAt, interval) : null;
-    const values = { name: input.name, serial: input.serial ?? null, calibrationIntervalDays: interval, lastCalibratedAt: input.lastCalibratedAt ?? null, nextDueAt: next, status: "in_service" as const, updatedAt: new Date() };
+    const values = { name: input.name, serial: input.serial ?? null, location: input.location ?? null, owner: input.owner ?? null, calibrationIntervalDays: interval, lastCalibratedAt: input.lastCalibratedAt ?? null, nextDueAt: next, status: "in_service" as const, updatedAt: new Date() };
     if (input.id) await db.update(gauges).set(values).where(and(eq(gauges.id, input.id), eq(gauges.orgId, ctx.orgId)));
     else await db.insert(gauges).values({ orgId: ctx.orgId, ...values });
     revalidatePath("/quality/gauges");
@@ -154,10 +158,21 @@ export async function calibrateGaugeAction(formData: FormData) {
   assertCan(ctx, "quality.edit");
   const id = String(formData.get("id") ?? "");
   const date = String(formData.get("date") ?? "");
+  const result = (String(formData.get("result") ?? "pass") || "pass") as "pass" | "fail" | "adjusted";
+  const certNo = String(formData.get("certNo") ?? "") || null;
+  const performedBy = String(formData.get("performedBy") ?? "") || null;
+  const notes = String(formData.get("notes") ?? "") || null;
   const db = await getDb();
   const [g] = await db.select().from(gauges).where(and(eq(gauges.id, id), eq(gauges.orgId, ctx.orgId)));
   if (g && date) {
-    await db.update(gauges).set({ lastCalibratedAt: date, nextDueAt: addDays(date, g.calibrationIntervalDays), status: "in_service", updatedAt: new Date() }).where(eq(gauges.id, id));
+    const { gaugeCalibrations } = await import("@/lib/db/schema");
+    const dueAt = addDays(date, g.calibrationIntervalDays);
+    await db.insert(gaugeCalibrations).values({ orgId: ctx.orgId, gaugeId: g.id, calibratedAt: date, dueAt, result, certNo, performedBy, notes });
+    await db
+      .update(gauges)
+      .set({ lastCalibratedAt: date, nextDueAt: dueAt, status: result === "fail" ? "out_of_service" : "in_service", updatedAt: new Date() })
+      .where(eq(gauges.id, id));
+    await audit(db, { orgId: ctx.orgId, userId: ctx.userId, action: "gauge.calibrate", entityType: "gauge", entityId: g.id, data: { date, result, certNo } });
   }
   revalidatePath("/quality/gauges");
 }

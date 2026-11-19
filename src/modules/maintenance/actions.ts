@@ -14,9 +14,9 @@ export async function saveAssetAction(_prev: ActionState, formData: FormData): P
   return withFormErrors(async () => {
     const ctx = await requireOrg();
     assertCan(ctx, "maintenance.edit");
-    const input = z.object({ name: reqStr, workCenterId: optStr, serial: optStr, purchasedAt: optDate }).parse(formObject(formData));
+    const input = z.object({ name: reqStr, workCenterId: optStr, serial: optStr, purchasedAt: optDate, manufacturer: optStr, model: optStr, location: optStr }).parse(formObject(formData));
     const db = await getDb();
-    await db.insert(assets).values({ orgId: ctx.orgId, name: input.name, workCenterId: input.workCenterId || null, serial: input.serial ?? null, purchasedAt: input.purchasedAt ?? null });
+    await db.insert(assets).values({ orgId: ctx.orgId, name: input.name, workCenterId: input.workCenterId || null, serial: input.serial ?? null, purchasedAt: input.purchasedAt ?? null, manufacturer: input.manufacturer ?? null, model: input.model ?? null, location: input.location ?? null });
     revalidatePath("/maintenance");
     return { ok: "Machine added." };
   });

@@ -23,6 +23,15 @@ export const orgs = pgTable("orgs", {
   settings: jsonb("settings").$type<OrgSettings>().notNull().default({}),
 });
 
+export type CompanyInfo = {
+  legalName?: string;
+  address?: { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string };
+  phone?: string;
+  email?: string;
+  website?: string;
+  taxId?: string;
+};
+
 export type OrgSettings = {
   currency?: string;
   fiscalYearStartMonth?: number;
@@ -31,6 +40,13 @@ export type OrgSettings = {
   overheadPct?: number;
   defaultMarginPct?: number;
   timezone?: string;
+  /** Percent over the ordered quantity a receipt may exceed (0 = exact). */
+  overReceiptPct?: number;
+  company?: CompanyInfo;
+  /** Standard text printed on documents. */
+  documents?: { quoteTerms?: string; poTerms?: string; invoiceTerms?: string; invoiceFooter?: string };
+  /** Per-document number prefixes, e.g. { order: "SO", invoice: "INV" }. */
+  numbering?: Record<string, string>;
 };
 
 export const users = pgTable("users", {

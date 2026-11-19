@@ -27,8 +27,9 @@ export default async function PrintQuotePage({ params }: { params: Promise<{ id:
         ["Valid until", fmtDate(row.q.validUntil) || "30 days"],
         ["Your RFQ", row.q.customerRfq ?? "—"],
       ]}
-      party={{ label: "Quoted to", name: row.customer.name, lines: [a?.line1, [a?.city, a?.state, a?.postalCode].filter(Boolean).join(" "), row.customer.email].filter(Boolean) as string[] }}
+      party={{ label: "Quoted to", name: row.customer.name, lines: [row.q.contactName ? `Attn: ${row.q.contactName}` : undefined, a?.line1, [a?.city, a?.state, a?.postalCode].filter(Boolean).join(" "), row.customer.email].filter(Boolean) as string[] }}
       notes={row.q.notes}
+      terms={row.q.terms ?? org?.settings.documents?.quoteTerms}
     >
       <table className="data">
         <thead>
@@ -48,7 +49,7 @@ export default async function PrintQuotePage({ params }: { params: Promise<{ id:
               <td>{l.description}</td>
               <td className="num">{fmtQty(l.qty)}</td>
               <td className="num">{fmtMoney(l.unitPrice)}</td>
-              <td className="num">{fmtMoney(Number(l.qty) * Number(l.unitPrice))}</td>
+              <td className="num">{fmtMoney(Number(l.qty) * Number(l.unitPrice) * (1 - Number(l.discountPct) / 100))}</td>
               <td className="num">{l.leadTimeDays} days</td>
             </tr>
           ))}

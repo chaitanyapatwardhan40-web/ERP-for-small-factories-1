@@ -11,14 +11,15 @@ Built for 5–50 person shops. One Next.js app, one Postgres database.
 
 | Area | Screens |
 | --- | --- |
-| Sell | Leads and quiet-customer list, customers, quotes with cost build-up and margin, sales orders with change log, order acknowledgement |
+| Sell | Leads with follow-ups, customers with credit limits, price lists and ship-to addresses, quotes with cost build-up, discounts, terms and revisions, sales orders with requested/promised dates, holds, line and order discounts and a change log, acknowledgement print |
 | Make | Items with multi-level BOMs and routings (cost roll-up), work orders, material issue, shop-floor clock in/out, schedule board by work center, printable traveler |
-| Buy & stock | Vendors, purchase orders (including outside processing), receiving with lots, shortage report → POs, inventory at weighted-average cost, counts/adjust/move |
-| Ship & bill | Pack and ship, pack list, invoices from shipments, customer payments, vendor bills from POs and expense bills, vendor payments, AR/AP aging |
-| Books | Chart of accounts, posting rules, periods with locks, journal, trial balance, P&L, balance sheet, job and customer margins, on-time delivery |
-| Quality | Inspection plans and records, NCRs with dispositions, CAPAs, gauges and calibration due dates, vendor rating |
-| People & machines | Employees with loaded rates and skills, machines, preventive maintenance, downtime log |
-| Admin | Documents and drawings with revisions, roles (owner / office / shop / accountant / read-only), audit log, settings, spreadsheet import |
+| Buy & stock | Vendors with price lists, purchase orders with revisions, non-stock lines, terms, ship-to, freight and tax, receiving with lots, locations and tolerance, receiving log, close short, shortage report → POs (safety stock, minimum order), inventory at weighted-average cost, counts/adjust/move |
+| Ship & bill | Pack and ship with packages, weight and freight, pack list and certificate of conformance, invoices with discounts and freight, credit memos, void, payments across several invoices with unapplied credit, customer statements, vendor bills with three-way match, void and payment, AR/AP aging |
+| Books | Chart of accounts, posting rules, periods with locks, journal, recurring entries, bank statement import and reconciliation, budgets vs actual, trial balance, P&L, balance sheet, cash flow, close checklist, sales tax and 1099 reports, job and customer margins, on-time delivery, journal export |
+| Quality | Inspection plans and records, NCRs with dispositions, root cause, containment and cost, CAPAs with preventive actions and effectiveness checks, gauges with calibration history and certificates, vendor rating |
+| People & machines | Employees with loaded rates, departments, shifts, training records and a skills matrix, machines with make, model, location and uptime, preventive maintenance, downtime log |
+| Admin | Documents and drawings with revisions, roles (owner / office / shop / accountant / read-only), audit log, company settings and document text, spreadsheet import, CSV export of every list |
+| Assistant | Ctrl/Cmd+K on any screen: open records by number, ask about late orders, stock, shortages, receivables or the schedule, and run common actions (receive a PO, ship and invoice, create POs for shortages, make an item, clock someone in) after a one-click confirmation. Works offline; an optional API key adds free-form phrasing. |
 
 ## Run it locally
 
@@ -32,34 +33,28 @@ Sign in as `owner@kitwise.demo` / `kitwise-demo` (also `office@` and `floor@`). 
 install: without `DATABASE_URL` the app runs on an embedded Postgres in `./.data`. `npm run
 db:reset` wipes it and reseeds.
 
-## Put a demo online (no database)
+## Put a demo online
 
-Demo mode runs the app on an in-memory copy of the sample company, rebuilt from
-`data/demo.tar.gz` whenever the server starts. Nothing to provision.
+Deploy to Vercel either from a terminal (`npm install`, then `npx vercel` and `npx vercel --prod`)
+or by importing the GitHub repository at vercel.com with the default settings. Both give a
+`.vercel.app` URL in a couple of minutes.
 
-```bash
-npm install
-npx vercel          # first run: sign in, accept the defaults → preview URL
-npx vercel --prod   # production URL
-```
+**Without a database (quick look).** On Vercel with no database configured the app runs in demo
+mode: each server instance restores an in-memory copy of the sample company from
+`data/demo.tar.gz`. Sign-in is a signed cookie, so it works on every instance, but instances do
+not share memory: a record created on one may not show on the next page, and everything resets
+on cold starts. Good for walking through the screens, not for trying a workflow end to end.
+`KITWISE_DEMO=1` forces this mode anywhere; `KITWISE_DEMO=0` turns it off.
 
-Demo mode is on automatically on Vercel when `DATABASE_URL` is not set (`KITWISE_DEMO=1`
-forces it anywhere, `KITWISE_DEMO=0` turns it off). Data lives in the memory of each server
-instance, so changes persist for a while and reset on cold starts. `npm run demo:snapshot`
-rebuilds the snapshot from the seed; the build does this automatically when the snapshot is more
-than a few days old.
+**With a free database (persistent, shared).** In the Vercel project open *Storage → Create
+Database*, pick Neon or Supabase (free plans), connect it to the project (this sets `DATABASE_URL`
+or `POSTGRES_URL`), add the environment variable `KITWISE_SEED=demo`, and redeploy. On first
+start the app applies the migrations and loads the sample company (about 15 seconds), after which
+every change persists and every visitor sees the same data. Remove `KITWISE_SEED` once you no
+longer want the sample company created in an empty database.
 
-## Deploy for real
-
-1. Create a Postgres database (Supabase, Neon, RDS or the Vercel Marketplace) and copy its
-   connection string.
-2. Set environment variables: `DATABASE_URL`; optionally `BLOB_READ_WRITE_TOKEN` (Vercel Blob
-   for uploaded drawings; without it files are stored on local disk, which is fine for a server
-   but not for serverless) and `ANTHROPIC_API_KEY` (column-mapping assistant in the import wizard).
-3. Run the migrations once: `DATABASE_URL=... npm run db:migrate`.
-4. Deploy (`npx vercel --prod`, or connect the repository to Vercel for previews on every branch).
-
-Vercel functions run 300 s by default and 800 s on Pro; nothing in the app needs more.
+`npm run demo:snapshot` rebuilds the demo-mode snapshot from the seed; the build refreshes it when
+it is more than a few days old.
 
 ## Development
 
@@ -68,8 +63,8 @@ npm run check        # typecheck + lint + tests + build (what CI runs)
 npm run db:generate  # after editing src/lib/db/schema
 ```
 
-See `CONTRIBUTING.md` for the architecture, invariants and conventions, and `docs/` for the
-domain glossary and module specs.
+See `CONTRIBUTING.md` for the architecture, invariants and conventions, `docs/field-audit.md` for
+what every screen holds and what is still missing, and `docs/` for the domain glossary and specs.
 
 ## Licence
 

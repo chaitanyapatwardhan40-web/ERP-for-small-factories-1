@@ -9,6 +9,7 @@ import { onHand } from "@/modules/inventory/service";
 import { Card, PageHeader } from "@/components/ui/page";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, FormGrid, Input, Select } from "@/components/ui/fields";
+import { AddressFields } from "@/components/forms/address-fields";
 import { createShipmentAction } from "@/modules/shipping/actions";
 import { fmtQty } from "@/lib/money";
 
@@ -24,7 +25,8 @@ export default async function NewShipmentPage({ searchParams }: { searchParams: 
   const lines = await db.select({ l: salesOrderLines, sku: items.sku }).from(salesOrderLines).innerJoin(items, eq(items.id, salesOrderLines.itemId)).where(eq(salesOrderLines.orderId, orderId)).orderBy(asc(salesOrderLines.lineNo));
   const locs = (await pickLocations(db, ctx.orgId)).filter((l) => l.type !== "wip");
   const stock = await Promise.all(lines.map((l) => onHand(db, ctx.orgId, l.l.itemId)));
-  const open = lines.map((l, i) => ({ ...l, open: Number(l.l.qty) - Number(l.l.qtyShipped), stock: stock[i] })).filter((l) => l.open > 0);
+  const open = lines.map((l, i) => ({ ...l, open: Number(l.l.qty) - Number(l.l.qtyShipped) - Number(l.l.qtyCancelled), stock: stock[i] })).filter((l) => l.open > 0);
+  const [cust] = await db.select().from(customers).where(eq(customers.id, row.o.customerId));
   return (
     <>
       <PageHeader title={`Pack ${row.o.number}`} description={row.customerName} crumbs={[{ href: "/orders", label: "Sales orders" }, { href: `/orders/${orderId}`, label: row.o.number }]} />
@@ -39,6 +41,7 @@ export default async function NewShipmentPage({ searchParams }: { searchParams: 
                 <th className="num">In stock</th>
                 <th className="num w-32">Ship now</th>
                 <th className="w-40">Lot</th>
+                <th className="w-40">From</th>
               </tr>
             </thead>
             <tbody>
@@ -55,6 +58,16 @@ export default async function NewShipmentPage({ searchParams }: { searchParams: 
                   </td>
                   <td>
                     <Input name={`lines[${i}][lotNumber]`} />
+                  </td>
+                  <td>
+                    <Select name={`lines[${i}][locationId]`} defaultValue="">
+                      <option value="">Default below</option>
+                      {locs.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.code}
+                        </option>
+                      ))}
+                    </Select>
                   </td>
                 </tr>
               ))}
@@ -73,15 +86,27 @@ export default async function NewShipmentPage({ searchParams }: { searchParams: 
               </Select>
             </Field>
             <Field label="Carrier">
-              <Input name="carrier" placeholder="UPS, FedEx, customer pickup" />
+              <Input name="carrier" placeholder="UPS, FedEx, customer pickup" defaultValue={row.o.shipVia ?? cust?.shipVia ?? ""} />
             </Field>
             <Field label="Tracking #">
               <Input name="tracking" />
             </Field>
-            <Field label="Notes">
+            <Field label="Packages">
+              <Input name="packages" type="number" min="1" defaultValue={1} />
+            </Field>
+            <Field label="Weight (lb)">
+              <Input name="weight" type="number" step="0.01" min="0" />
+            </Field>
+            <Field label="Freight to invoice" hint="Blank = order's freight">
+              <Input name="freightCharge" type="number" step="0.01" min="0" defaultValue={Number(row.o.freight) ? String(row.o.freight) : ""} />
+            </Field>
+            <Field label="Notes" className="md:col-span-2">
               <Input name="notes" />
             </Field>
           </FormGrid>
+          <div className="mt-3">
+            <AddressFields prefix="shipTo" value={row.o.shipTo ?? cust?.shippingAddress} title="Ship to" />
+          </div>
           <label className="mt-3 flex items-center gap-2 text-sm">
             <input type="checkbox" name="ship" defaultChecked /> Ship now (otherwise save as a packed draft)
           </label>

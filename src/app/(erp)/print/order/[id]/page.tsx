@@ -5,6 +5,7 @@ import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { customers, items, orgs, salesOrderLines, salesOrders } from "@/lib/db/schema";
 import { PrintDoc } from "@/components/print";
+import { formatAddress } from "@/lib/forms";
 import { fmtDate, fmtMoney, fmtQty } from "@/lib/money";
 
 export default async function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +17,8 @@ export default async function PrintOrderPage({ params }: { params: Promise<{ id:
   if (!row) notFound();
   const [org] = await db.select().from(orgs).where(eq(orgs.id, ctx.orgId));
   const lines = await db.select({ l: salesOrderLines, sku: items.sku }).from(salesOrderLines).innerJoin(items, eq(items.id, salesOrderLines.itemId)).where(eq(salesOrderLines.orderId, row.o.id)).orderBy(asc(salesOrderLines.lineNo));
-  const a = row.customer.shippingAddress ?? row.customer.billingAddress;
+  const ship = row.o.shipTo ?? row.customer.shippingAddress ?? row.customer.billingAddress;
+  const bill = row.customer.billingAddress;
   return (
     <PrintDoc
       title="Order acknowledgement"
@@ -26,9 +28,13 @@ export default async function PrintOrderPage({ params }: { params: Promise<{ id:
         ["Order date", fmtDate(row.o.orderDate)],
         ["Promised", fmtDate(row.o.promisedDate) || "—"],
         ["Your PO", row.o.customerPo ?? "—"],
+        ["Terms", `Net ${row.o.termsDays ?? row.customer.termsDays}`],
+        ["Ship via", row.o.shipVia || "—"],
       ]}
-      party={{ label: "Ship to", name: row.customer.name, lines: [a?.line1, [a?.city, a?.state, a?.postalCode].filter(Boolean).join(" ")].filter(Boolean) as string[] }}
+      party={{ label: "Bill to", name: row.customer.name, lines: formatAddress(bill) }}
+      secondParty={{ label: "Ship to", name: row.customer.name, lines: formatAddress(ship) }}
       notes={row.o.notes}
+      terms={org?.settings.documents?.invoiceTerms}
     >
       <table className="data">
         <thead>
@@ -51,7 +57,7 @@ export default async function PrintOrderPage({ params }: { params: Promise<{ id:
               <td className="num">{fmtQty(l.qty)}</td>
               <td>{fmtDate(l.promisedDate)}</td>
               <td className="num">{fmtMoney(l.unitPrice)}</td>
-              <td className="num">{fmtMoney(Number(l.qty) * Number(l.unitPrice))}</td>
+              <td className="num">{fmtMoney((Number(l.qty) - Number(l.qtyCancelled)) * Number(l.unitPrice) * (1 - Number(l.discountPct) / 100))}</td>
             </tr>
           ))}
         </tbody>

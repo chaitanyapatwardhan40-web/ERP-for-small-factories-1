@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -73,6 +73,8 @@ export default async function ShopFloorPage({ searchParams }: { searchParams: Pr
                   <SubmitButton size="md" className="w-full">
                     Clock out
                   </SubmitButton>
+                  <Input name="scrapReason" placeholder="Scrap reason" className="col-span-2" />
+                  <Input name="notes" placeholder="Note" />
                   <label className="col-span-3 flex items-center gap-2 text-xs">
                     <input type="checkbox" name="operationComplete" /> This operation is finished
                   </label>

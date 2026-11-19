@@ -3,6 +3,9 @@ import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
 import { isDemo } from "@/lib/env";
 import { orgsForUser } from "@/modules/platform/service";
+import { AssistantPanel } from "@/components/assistant/panel";
+import { ASSISTANT_PLACEHOLDER } from "@/modules/assistant/service";
+import { Suspense } from "react";
 import { logoutAction, switchOrgAction } from "@/modules/platform/actions";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +54,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         </header>
         <main className="flex-1 px-6 py-5">{children}</main>
       </div>
+      <Suspense fallback={null}>
+        <AssistantPanel placeholder={ASSISTANT_PLACEHOLDER} />
+      </Suspense>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   issueMaterial,
   recordLabor,
   releaseWorkOrder,
+  updateWorkOrder,
 } from "./service";
 
 export async function createWorkOrderAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -109,7 +110,7 @@ export async function clockOutAction(_prev: ActionState, formData: FormData): Pr
   return withFormErrors(async () => {
     const ctx = await requireOrg();
     assertCan(ctx, "shopfloor.clock");
-    const input = z.object({ laborEntryId: reqStr, qtyGood: optNum, qtyScrap: optNum, notes: optStr, operationComplete: optStr, returnTo: optStr }).parse(formObject(formData));
+    const input = z.object({ laborEntryId: reqStr, qtyGood: optNum, qtyScrap: optNum, scrapReason: optStr, notes: optStr, operationComplete: optStr, returnTo: optStr }).parse(formObject(formData));
     const db = await getDb();
     const r = await db.transaction((tx) => clockOut(tx, ctx, { ...input, operationComplete: !!input.operationComplete }));
     revalidatePath(input.returnTo ?? "/shop-floor");
@@ -135,7 +136,7 @@ export async function completeWorkOrderAction(_prev: ActionState, formData: Form
   return withFormErrors(async () => {
     const ctx = await requireOrg();
     assertCan(ctx, "production.edit");
-    const input = z.object({ workOrderId: reqStr, qtyGood: z.coerce.number().min(0), qtyScrap: optNum, locationId: reqStr, lotNumber: optStr }).parse(formObject(formData));
+    const input = z.object({ workOrderId: reqStr, qtyGood: z.coerce.number().min(0), qtyScrap: optNum, scrapReason: optStr, locationId: reqStr, lotNumber: optStr }).parse(formObject(formData));
     const db = await getDb();
     const [org] = await db.select().from(orgs).where(eq(orgs.id, ctx.orgId));
     await db.transaction((tx) =>
@@ -144,5 +145,26 @@ export async function completeWorkOrderAction(_prev: ActionState, formData: Form
     revalidatePath(`/work-orders/${input.workOrderId}`);
     // The completion card unmounts on success; the Result card on the fresh page shows the outcome.
     redirect(`/work-orders/${input.workOrderId}`);
+  });
+}
+
+export async function updateWorkOrderAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return withFormErrors(async () => {
+    const ctx = await requireOrg();
+    assertCan(ctx, "production.edit");
+    const input = z.object({ workOrderId: reqStr, priority: optNum, dueDate: optDate, scheduledStart: optDate, scheduledEnd: optDate, notes: optStr, qty: optNum }).parse(formObject(formData));
+    const db = await getDb();
+    await db.transaction((tx) =>
+      updateWorkOrder(tx, ctx, input.workOrderId, {
+        priority: input.priority ?? null,
+        dueDate: input.dueDate ?? null,
+        scheduledStart: input.scheduledStart ?? null,
+        scheduledEnd: input.scheduledEnd ?? null,
+        notes: input.notes ?? null,
+        qty: input.qty ?? null,
+      }),
+    );
+    revalidatePath(`/work-orders/${input.workOrderId}`);
+    return { ok: "Work order updated." };
   });
 }

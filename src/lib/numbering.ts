@@ -11,6 +11,7 @@ const PREFIX: Record<string, string> = {
   shipment: "SH",
   invoice: "INV",
   payment: "PAY",
+  credit: "CM",
   bill: "BILL",
   vpayment: "VP",
   journal: "JE",

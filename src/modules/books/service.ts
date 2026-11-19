@@ -83,12 +83,23 @@ export async function postEvent(db: DbOrTx, input: PostEventInput): Promise<stri
   const amount = round4(input.amount);
   if (amount === 0) return null;
   if (amount < 0) throw new PostingError(`Negative amount for ${input.event}; post the opposite event instead.`);
-  const [rule] = await db
+  let [rule] = await db
     .select()
     .from(postingRules)
     .where(and(eq(postingRules.orgId, input.orgId), eq(postingRules.event, input.event)))
     .limit(1);
-  if (!rule) throw new PostingError(`No posting rule for event "${input.event}".`);
+  if (!rule) {
+    // Events added after the org was set up fall back to the default rule,
+    // which is stored so the accountant can see and change it.
+    const def = DEFAULT_RULES.find((r) => r.event === input.event);
+    if (!def) throw new PostingError(`No posting rule for event "${input.event}".`);
+    [rule] = await db
+      .insert(postingRules)
+      .values({ orgId: input.orgId, event: def.event, debitSubtype: def.debit, creditSubtype: def.credit, description: def.description })
+      .onConflictDoNothing()
+      .returning();
+    if (!rule) rule = { id: "", orgId: input.orgId, event: def.event, debitSubtype: def.debit, creditSubtype: def.credit, description: def.description, createdAt: new Date(), updatedAt: new Date() };
+  }
   const debitAcct = await accountBySubtype(db, input.orgId, input.debitSubtype ?? rule.debitSubtype);
   const creditAcct = await accountBySubtype(db, input.orgId, input.creditSubtype ?? rule.creditSubtype);
   await assertPeriodOpen(db, input.orgId, input.date);
@@ -145,6 +156,21 @@ export async function postJournal(
 }
 
 /** Reverse an entry with a mirror-image entry dated today (or as given). */
+/** Reverse every posted entry that came from one source document (void). */
+export async function reverseSource(db: DbOrTx, actor: { orgId: string; userId: string }, sourceType: string, sourceId: string, memo: string, date?: string) {
+  const entries = await db
+    .select()
+    .from(journalEntries)
+    .where(and(eq(journalEntries.orgId, actor.orgId), eq(journalEntries.sourceType, sourceType), eq(journalEntries.sourceId, sourceId), eq(journalEntries.status, "posted")));
+  const d = date ?? new Date().toISOString().slice(0, 10);
+  for (const e of entries) {
+    if (e.reversesId) continue;
+    const revId = await reverseEntry(db, actor.orgId, e.id, d);
+    await db.update(journalEntries).set({ memo }).where(eq(journalEntries.id, revId));
+  }
+  return entries.length;
+}
+
 export async function reverseEntry(db: DbOrTx, orgId: string, entryId: string, date: string) {
   const [entry] = await db
     .select()

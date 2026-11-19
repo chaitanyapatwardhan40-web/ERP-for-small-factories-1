@@ -1,23 +1,20 @@
-import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import Link from "@/components/ui/link";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
-import { customers, quotes } from "@/lib/db/schema";
 import { Card, EmptyState, PageHeader, StatusBadge, Stat } from "@/components/ui/page";
 import { LinkButton } from "@/components/ui/button";
-import { fmtDate, fmtMoney } from "@/lib/money";
+import { ListToolbar } from "@/components/ui/list-toolbar";
+import { expireQuotes, listQuotes } from "@/modules/sales/service";
+import { fmtDate, fmtMoney, today } from "@/lib/money";
 
 export const metadata = { title: "Quotes" };
 
-export default async function QuotesPage() {
+export default async function QuotesPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string }> }) {
+  const sp = await searchParams;
   const ctx = await requireOrg();
   const db = await getDb();
-  const rows = await db
-    .select({ q: quotes, customerName: customers.name })
-    .from(quotes)
-    .innerJoin(customers, eq(customers.id, quotes.customerId))
-    .where(eq(quotes.orgId, ctx.orgId))
-    .orderBy(desc(quotes.quoteDate), desc(quotes.number));
+  await expireQuotes(db, ctx.orgId, today());
+  const rows = await listQuotes(db, ctx.orgId, sp);
   const open = rows.filter((r) => r.q.status === "draft" || r.q.status === "sent");
   const won = rows.filter((r) => r.q.status === "accepted");
   const decided = rows.filter((r) => ["accepted", "lost", "expired"].includes(r.q.status));
@@ -25,6 +22,13 @@ export default async function QuotesPage() {
   return (
     <>
       <PageHeader title="Quotes" actions={<LinkButton href="/quotes/new">New quote</LinkButton>} />
+      <ListToolbar
+        action="/quotes"
+        q={sp.q}
+        exportKind="quotes"
+        params={sp}
+        filters={[{ name: "status", value: sp.status, options: [{ value: "", label: "All statuses" }, ...["draft", "sent", "accepted", "lost", "expired"].map((s) => ({ value: s, label: s }))] }]}
+      />
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Stat label="Open quotes" value={open.length} hint={fmtMoney(open.reduce((s, r) => s + Number(r.q.subtotal), 0))} />
         <Stat label="Won" value={won.length} hint={fmtMoney(won.reduce((s, r) => s + Number(r.q.subtotal), 0))} tone="good" />

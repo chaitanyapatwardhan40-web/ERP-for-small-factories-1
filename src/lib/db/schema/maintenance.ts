@@ -14,6 +14,9 @@ export const assets = pgTable("assets", {
   }),
   serial: text("serial"),
   purchasedAt: date("purchased_at"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  location: text("location"),
   status: text("status", { enum: ["running", "down", "retired"] })
     .notNull()
     .default("running"),

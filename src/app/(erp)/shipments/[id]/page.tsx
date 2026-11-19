@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
@@ -9,7 +9,8 @@ import { Card, DL, PageHeader, StatusBadge } from "@/components/ui/page";
 import { Button, LinkButton } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input } from "@/components/ui/fields";
-import { invoiceShipmentAction, shipShipmentAction } from "@/modules/shipping/actions";
+import { deleteShipmentAction, invoiceShipmentAction, shipShipmentAction, updateShipmentAction } from "@/modules/shipping/actions";
+import { formatAddress } from "@/lib/forms";
 import { fmtDateTime, fmtMoney, fmtQty, today } from "@/lib/money";
 
 export default async function ShipmentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -54,6 +55,9 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
           <>
             <LinkButton href={`/print/packlist/${s.id}`} variant="secondary">
               Pack list
+            </LinkButton>
+            <LinkButton href={`/print/coc/${s.id}`} variant="secondary">
+              Cert of conformance
             </LinkButton>
             {s.status === "draft" ? (
               <form action={shipShipmentAction}>
@@ -100,8 +104,43 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
         </Card>
         <div className="space-y-4">
           <Card title="Details">
-            <DL rows={[["Carrier", s.carrier], ["Tracking", s.tracking], ["Notes", s.notes]]} />
+            <DL
+              rows={[
+                ["Ship to", s.shipTo ? formatAddress(s.shipTo).join(", ") : formatAddress(customer.shippingAddress).join(", ") || null],
+                ["Carrier", s.carrier],
+                ["Tracking", s.tracking],
+                ["Packages", s.packages],
+                ["Weight", Number(s.weight) ? `${fmtQty(s.weight)} lb` : null],
+                ["Freight charge", Number(s.freightCharge) ? fmtMoney(s.freightCharge) : null],
+                ["Notes", s.notes],
+              ]}
+            />
           </Card>
+          <Card title="Update details">
+            <ActionForm action={updateShipmentAction} className="space-y-2">
+              <input type="hidden" name="id" value={s.id} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input name="carrier" placeholder="Carrier" defaultValue={s.carrier ?? ""} />
+                <Input name="tracking" placeholder="Tracking #" defaultValue={s.tracking ?? ""} />
+                <Input name="packages" type="number" min="1" placeholder="Packages" defaultValue={s.packages} />
+                <Input name="weight" type="number" step="0.01" min="0" placeholder="Weight lb" defaultValue={Number(s.weight) ? String(s.weight) : ""} />
+                {!s.invoiceId ? <Input name="freightCharge" type="number" step="0.01" min="0" placeholder="Freight" defaultValue={Number(s.freightCharge) ? String(s.freightCharge) : ""} /> : null}
+              </div>
+              <Input name="notes" placeholder="Notes" defaultValue={s.notes ?? ""} />
+              <SubmitButton variant="secondary" className="w-full">
+                Save
+              </SubmitButton>
+            </ActionForm>
+          </Card>
+          {s.status === "draft" ? (
+            <form action={deleteShipmentAction}>
+              <input type="hidden" name="id" value={s.id} />
+              <input type="hidden" name="orderId" value={order.id} />
+              <Button type="submit" variant="danger" className="w-full">
+                Delete draft shipment
+              </Button>
+            </form>
+          ) : null}
           {s.status === "shipped" && !s.invoiceId ? (
             <Card title="Invoice this shipment">
               <ActionForm action={invoiceShipmentAction} className="space-y-2">

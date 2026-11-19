@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq } from "drizzle-orm";
@@ -10,8 +10,8 @@ import { onHand } from "@/modules/inventory/service";
 import { Card, DL, PageHeader, StatusBadge } from "@/components/ui/page";
 import { Button, LinkButton } from "@/components/ui/button";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
-import { Input, Select } from "@/components/ui/fields";
-import { cancelWorkOrderAction, completeWorkOrderAction, issueAllAction, issueMaterialAction, recordLaborAction, releaseWorkOrderAction } from "@/modules/production/actions";
+import { Input, Select, Textarea } from "@/components/ui/fields";
+import { cancelWorkOrderAction, completeWorkOrderAction, issueAllAction, issueMaterialAction, recordLaborAction, releaseWorkOrderAction, updateWorkOrderAction } from "@/modules/production/actions";
 import { AttachmentsCard } from "@/components/forms/attachments";
 import { fmtDate, fmtDateTime, fmtMoney, fmtQty } from "@/lib/money";
 
@@ -136,6 +136,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                   <th className="num">Required</th>
                   <th className="num">Issued</th>
                   <th className="num">In stock</th>
+                  <th className="num">Short</th>
                   <th className="num">Avg cost</th>
                 </tr>
               </thead>
@@ -153,13 +154,22 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                       <td className="num">{fmtQty(m.qtyRequired)}</td>
                       <td className={`num ${Number(m.qtyIssued) >= Number(m.qtyRequired) ? "text-good" : ""}`}>{fmtQty(m.qtyIssued)}</td>
                       <td className={`num ${short && Number(m.qtyIssued) < Number(m.qtyRequired) ? "text-warn" : ""}`}>{fmtQty(stock[i])}</td>
+                      <td className="num">
+                        {short ? (
+                          <Link href={`/purchasing/new?itemId=${m.itemId}&qty=${Math.max(0, Number(m.qtyRequired) - Number(m.qtyIssued) - stock[i])}`} className="text-bad hover:underline">
+                            {fmtQty(Math.max(0, Number(m.qtyRequired) - Number(m.qtyIssued) - stock[i]))}
+                          </Link>
+                        ) : (
+                          <span className="text-ink-3">—</span>
+                        )}
+                      </td>
                       <td className="num">{fmtMoney(avgCost)}</td>
                     </tr>
                   );
                 })}
                 {!mats.length ? (
                   <tr>
-                    <td colSpan={5} className="text-ink-3">
+                    <td colSpan={6} className="text-ink-3">
                       No BOM on this item.
                     </td>
                   </tr>
@@ -334,6 +344,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                     <Input name="qtyScrap" type="number" step="0.0001" defaultValue={0} />
                   </div>
                 </div>
+                <Input name="scrapReason" placeholder="Scrap reason (if any)" />
                 <Select name="locationId" defaultValue={stockLocs[0]?.id ?? ""}>
                   {stockLocs.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -351,11 +362,46 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               <DL
                 rows={[
                   ["Completed", fmtDateTime(wo.completedAt)],
-                  ["Good / scrap", `${fmtQty(wo.qtyComplete)} / ${fmtQty(wo.qtyScrap)}`],
+                  ["Good / scrap", `${fmtQty(wo.qtyComplete)} / ${fmtQty(wo.qtyScrap)}${wo.scrapReason ? ` (${wo.scrapReason})` : ""}`],
                   ["Actual unit cost", fmtMoney(Number(wo.qtyComplete) ? (cost - (cost / (Number(wo.qtyComplete) + Number(wo.qtyScrap))) * Number(wo.qtyScrap)) / Number(wo.qtyComplete) : 0)],
                   ["vs standard", fmtMoney(item.standardCost)],
                 ]}
               />
+            </Card>
+          ) : null}
+          {!["complete", "closed", "cancelled"].includes(wo.status) ? (
+            <Card title="Planning">
+              <ActionForm action={updateWorkOrderAction} className="space-y-2">
+                <input type="hidden" name="workOrderId" value={wo.id} />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="mb-1 block text-xs text-ink-2">Priority (1 = first)</span>
+                    <Input name="priority" type="number" min="1" max="9" defaultValue={wo.priority} />
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-xs text-ink-2">Due</span>
+                    <Input name="dueDate" type="date" defaultValue={wo.dueDate ?? ""} />
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-xs text-ink-2">Scheduled start</span>
+                    <Input name="scheduledStart" type="date" defaultValue={wo.scheduledStart ?? ""} />
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-xs text-ink-2">Scheduled end</span>
+                    <Input name="scheduledEnd" type="date" defaultValue={wo.scheduledEnd ?? ""} />
+                  </div>
+                  {wo.status === "planned" ? (
+                    <div>
+                      <span className="mb-1 block text-xs text-ink-2">Quantity</span>
+                      <Input name="qty" type="number" step="0.0001" min="0.0001" defaultValue={wo.qty} />
+                    </div>
+                  ) : null}
+                </div>
+                <Textarea name="notes" placeholder="Notes for the floor (printed on the traveler)" defaultValue={wo.notes ?? ""} />
+                <SubmitButton variant="secondary" className="w-full">
+                  Save
+                </SubmitButton>
+              </ActionForm>
             </Card>
           ) : null}
           <AttachmentsCard entityType="work-order" entityId={wo.id} rows={docs} returnTo={`/work-orders/${wo.id}`} />

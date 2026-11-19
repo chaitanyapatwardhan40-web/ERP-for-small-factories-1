@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { asc, desc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
@@ -74,6 +74,7 @@ export default async function CrmPage() {
                             </option>
                           ))}
                         </select>
+                        <input name="lostReason" placeholder="If lost, why" className="w-28 rounded border border-line px-1 py-0.5 text-xs" />
                         <button className="text-xs text-brand hover:underline" type="submit">
                           set
                         </button>
@@ -173,7 +174,10 @@ export default async function CrmPage() {
                 <Input name="estimatedValue" type="number" step="100" placeholder="Est. value" />
               </div>
               <Input name="nextAction" placeholder="Next action (call back Tuesday)" />
-              <Input name="nextActionAt" type="date" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input name="nextActionAt" type="date" title="Next action date" />
+                <Input name="expectedClose" type="date" title="Expected close" />
+              </div>
               <Textarea name="notes" placeholder="Notes" className="min-h-12" />
               <SubmitButton className="w-full">Add lead</SubmitButton>
             </ActionForm>

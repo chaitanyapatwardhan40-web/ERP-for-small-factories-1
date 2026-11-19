@@ -1,14 +1,14 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 import { requireOrg } from "@/lib/tenancy";
 import { getDb } from "@/lib/db";
-import { purchaseOrders, vendorBillLines, vendorBills, vendorPayments, vendors } from "@/lib/db/schema";
+import { purchaseOrderLines, purchaseOrders, vendorBillLines, vendorBills, vendorPayments, vendors } from "@/lib/db/schema";
 import { Card, DL, PageHeader, StatusBadge } from "@/components/ui/page";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Input, Select } from "@/components/ui/fields";
-import { payBillAction } from "@/modules/purchasing/actions";
+import { payBillAction, voidBillAction } from "@/modules/purchasing/actions";
 import { fmtDate, fmtMoney, fmtQty, today } from "@/lib/money";
 
 export default async function BillPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,11 +19,21 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
   const [row] = await db.select({ b: vendorBills, vendor: vendors, po: purchaseOrders }).from(vendorBills).innerJoin(vendors, eq(vendors.id, vendorBills.vendorId)).leftJoin(purchaseOrders, eq(purchaseOrders.id, vendorBills.poId)).where(and(eq(vendorBills.id, id), eq(vendorBills.orgId, ctx.orgId)));
   if (!row) notFound();
   const { b, vendor, po } = row;
-  const [lines, pays] = await Promise.all([
+  const [lines, pays, poLines] = await Promise.all([
     db.select().from(vendorBillLines).where(eq(vendorBillLines.billId, b.id)),
     db.select().from(vendorPayments).where(eq(vendorPayments.billId, b.id)).orderBy(desc(vendorPayments.paidAt)),
+    po ? db.select().from(purchaseOrderLines).where(eq(purchaseOrderLines.poId, po.id)) : Promise.resolve([]),
   ]);
   const open = Number(b.total) - Number(b.amountPaid);
+  // Three-way match: ordered vs received vs billed, per PO line on this bill.
+  const match = lines
+    .filter((l) => l.poLineId)
+    .map((l) => {
+      const pl = poLines.find((p) => p.id === l.poLineId);
+      const ok = !pl || pl.lineType === "service" || (Number(l.unitCost) <= Number(pl.unitCost) + 1e-9 && Number(pl.qtyBilled) <= Number(pl.qtyReceived) + 1e-9);
+      return { lineId: l.id, ordered: pl ? Number(pl.qty) : null, received: pl ? Number(pl.qtyReceived) : null, poCost: pl ? Number(pl.unitCost) : null, ok };
+    });
+  const matched = match.length > 0 && match.every((m) => m.ok);
   return (
     <>
       <PageHeader
@@ -68,12 +78,22 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
                   </td>
                   <td className="num">{fmtMoney(b.subtotal)}</td>
                 </tr>
-                <tr>
-                  <td colSpan={3} className="text-right">
-                    Tax / freight
-                  </td>
-                  <td className="num">{fmtMoney(b.tax)}</td>
-                </tr>
+                {Number(b.tax) ? (
+                  <tr>
+                    <td colSpan={3} className="text-right">
+                      Tax
+                    </td>
+                    <td className="num">{fmtMoney(b.tax)}</td>
+                  </tr>
+                ) : null}
+                {Number(b.freight) ? (
+                  <tr>
+                    <td colSpan={3} className="text-right">
+                      Freight
+                    </td>
+                    <td className="num">{fmtMoney(b.freight)}</td>
+                  </tr>
+                ) : null}
                 <tr>
                   <td colSpan={3} className="text-right font-semibold">
                     Total
@@ -110,9 +130,22 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
                 ["Total", fmtMoney(b.total)],
                 ["Paid", fmtMoney(b.amountPaid)],
                 ["Open", <strong key="o">{fmtMoney(open)}</strong>],
+                ["Match", po ? (matched ? "Ordered, received and billed agree" : match.length ? "Check: billed exceeds received or PO cost" : "No PO lines") : "—"],
+                ["Notes", b.notes],
               ]}
             />
           </Card>
+          {b.status === "approved" && Number(b.amountPaid) === 0 ? (
+            <Card title="Void">
+              <ActionForm action={voidBillAction} className="space-y-2">
+                <input type="hidden" name="billId" value={b.id} />
+                <Input name="reason" placeholder="Reason" required />
+                <SubmitButton variant="danger" className="w-full">
+                  Void bill
+                </SubmitButton>
+              </ActionForm>
+            </Card>
+          ) : null}
           {b.status === "approved" && open > 0 ? (
             <Card title="Pay">
               <ActionForm action={payBillAction} className="space-y-2">

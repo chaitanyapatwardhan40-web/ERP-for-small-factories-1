@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { uuidOr404 } from "@/lib/ids";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
@@ -14,6 +14,7 @@ import { activeBom, activeRouting, rollUpCost, whereUsed } from "@/modules/items
 import { onHand, stockByLocation } from "@/modules/inventory/service";
 import { addBomLineAction, addOperationAction, newBomRevisionAction, recostItemAction, removeBomLineAction, removeOperationAction } from "@/modules/items/actions";
 import { AttachmentsCard } from "@/components/forms/attachments";
+import { vendorsForItem } from "@/modules/purchasing/service";
 
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -44,7 +45,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         .where(eq(routingOperations.routingId, routing.id))
         .orderBy(asc(routingOperations.seq))
     : [];
-  const [wcs, vendorList, used, stock, total, docs, revs] = await Promise.all([
+  const [wcs, vendorList, used, stock, total, docs, revs, suppliers] = await Promise.all([
     db.select().from(workCenters).where(and(eq(workCenters.orgId, ctx.orgId), eq(workCenters.active, true))).orderBy(asc(workCenters.code)),
     db.select({ id: vendors.id, name: vendors.name }).from(vendors).where(eq(vendors.orgId, ctx.orgId)).orderBy(asc(vendors.name)),
     whereUsed(db, ctx.orgId, item.id),
@@ -52,6 +53,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     onHand(db, ctx.orgId, item.id),
     db.select().from(attachments).where(and(eq(attachments.orgId, ctx.orgId), eq(attachments.entityType, "item"), eq(attachments.entityId, item.id))).orderBy(asc(attachments.createdAt)),
     db.select().from(bomRevisions).where(and(eq(bomRevisions.orgId, ctx.orgId), eq(bomRevisions.itemId, item.id))).orderBy(asc(bomRevisions.createdAt)),
+    vendorsForItem(db, ctx.orgId, item.id),
   ]);
   let cost = { material: 0, labor: 0, outside: 0, overhead: 0, total: 0 };
   try {
@@ -129,6 +131,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                           {l.sku}
                         </Link>{" "}
                         <span className="text-ink-3">{l.name}</span>
+                        {l.line.refDes ? <div className="text-xs text-ink-3">{l.line.refDes}</div> : null}
+                        {l.line.notes ? <div className="text-xs text-ink-3">{l.line.notes}</div> : null}
                       </td>
                       <td>
                         <Badge tone={l.type === "make" ? "info" : "neutral"}>{l.type}</Badge>
@@ -171,6 +175,10 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   <div className="w-24">
                     <span className="mb-1 block text-xs text-ink-2">Scrap %</span>
                     <Input name="scrapPct" type="number" step="0.1" defaultValue={0} />
+                  </div>
+                  <div className="w-32">
+                    <span className="mb-1 block text-xs text-ink-2">Ref / position</span>
+                    <Input name="refDes" placeholder="R1, left bracket…" />
                   </div>
                   <div className="flex-1">
                     <span className="mb-1 block text-xs text-ink-2">Note</span>
@@ -367,12 +375,59 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               rows={[
                 ["Reorder point", fmtQty(item.reorderPoint)],
                 ["Reorder qty", fmtQty(item.reorderQty)],
+                ["Safety stock", fmtQty(item.safetyStock)],
+                ["Min order qty", fmtQty(item.minOrderQty)],
                 ["Lead time", `${item.leadTimeDays} days`],
                 ["Lots", item.trackLots ? "tracked" : "not tracked"],
+                ["Shelf life", item.shelfLifeDays ? `${item.shelfLifeDays} days` : "—"],
+                ["Weight", Number(item.weight) ? `${fmtQty(item.weight)} lb` : "—"],
+                ["Category", item.category],
+                ["Barcode", item.barcode],
                 ["BOM revisions", revs.map((r) => `${r.rev} (${r.status})`).join(", ") || "—"],
               ]}
             />
           </Card>
+          {item.type === "buy" ? (
+            <Card title="Vendors" padded={false}>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th>Their p/n</th>
+                    <th className="num">Last cost</th>
+                    <th className="num">Lead d</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suppliers.map((s) => (
+                    <tr key={s.vi.id}>
+                      <td>
+                        <Link href={`/vendors/${s.vendorId}`} className="text-brand hover:underline">
+                          {s.vendorName}
+                        </Link>
+                        {s.vi.preferred ? <span className="ml-1 text-xs text-ink-3">preferred</span> : null}
+                      </td>
+                      <td>{s.vi.vendorPartNo}</td>
+                      <td className="num">{fmtMoney(s.vi.lastCost)}</td>
+                      <td className="num">{s.vi.leadTimeDays ?? s.vendorLead}</td>
+                    </tr>
+                  ))}
+                  {!suppliers.length ? (
+                    <tr>
+                      <td colSpan={4} className="text-ink-3">
+                        No vendor prices yet. Add them on the vendor&apos;s page or receive a PO.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+              <div className="p-3">
+                <LinkButton href={`/purchasing/new?itemId=${item.id}${item.preferredVendorId ? `&vendorId=${item.preferredVendorId}` : ""}`} variant="secondary" size="sm">
+                  Raise PO
+                </LinkButton>
+              </div>
+            </Card>
+          ) : null}
           <AttachmentsCard entityType="item" entityId={item.id} rows={docs} />
         </div>
       </div>
