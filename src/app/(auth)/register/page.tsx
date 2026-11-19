@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, Input } from "@/components/ui/fields";
 import { registerAction } from "@/modules/platform/actions";

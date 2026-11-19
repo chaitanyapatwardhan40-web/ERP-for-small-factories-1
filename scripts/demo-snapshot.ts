@@ -23,6 +23,9 @@ async function main() {
   process.env.PGLITE_DATA_DIR = "memory://";
   process.env.KITWISE_DEMO = "0";
   delete process.env.DATABASE_URL;
+  delete process.env.POSTGRES_URL;
+  delete process.env.POSTGRES_PRISMA_URL;
+  delete process.env.KITWISE_SEED;
 
   const { getDb, getEmbeddedClient } = await import("../src/lib/db");
   const { seedDemo } = await import("../src/lib/db/seed");

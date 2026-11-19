@@ -1,7 +1,7 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Field, Input } from "@/components/ui/fields";
-import { DEMO_LOGIN, isDemo } from "@/lib/env";
+import { DEMO_LOGIN, showsDemoLogin } from "@/lib/env";
 import { loginAction } from "@/modules/platform/actions";
 
 export const metadata = { title: "Sign in" };
@@ -9,7 +9,7 @@ export const metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
-  const demo = isDemo();
+  const demo = showsDemoLogin();
   return (
     <ActionForm action={loginAction} className="space-y-4">
       <Field label="Email">

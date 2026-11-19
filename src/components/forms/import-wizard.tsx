@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/fields";
 import { ENTITIES, type EntityKind } from "@/modules/importer/mapping";
